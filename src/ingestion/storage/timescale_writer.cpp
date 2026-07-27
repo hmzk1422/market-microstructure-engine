@@ -106,18 +106,16 @@ bool TimescaleWriter::insert_orderbook(const json& msg) {
         std::string symbol = data["s"].get<std::string>();
         int64_t ts = msg["ts"].get<int64_t>();
         int64_t seq = data.value("seq", 0LL);
-        int64_t update_id = data.value("u", 0LL);
+        int64_t update_id = data.value("u", 0LL);   // one update_id per message
         bool is_snapshot = (msg["type"].get<std::string>() == "snapshot");
 
-        // Format timestamp (Bybit gives ms, convert to TIMESTAMPTZ string)
-        // Bybit ts is in milliseconds
         auto time_s = std::to_string(ts / 1000) + "." + std::to_string(ts % 1000);
 
         // Insert bids
         for (const auto& level : data["b"]) {
-            double price = level[0].get<double>();
-            double size  = level[1].get<double>();
-            int64_t uid  = level[2].get<int64_t>();
+            double price = std::stod(level[0].get<std::string>());  // was level[0].get<double>()
+            double size  = std::stod(level[1].get<std::string>());  // was level[1].get<double>()
+            // no level[2] — Bybit levels are only [price, size]
 
             std::ostringstream sql;
             sql << "INSERT INTO orderbook (time, symbol, side, price, size, update_id, is_snapshot, seq) VALUES "
@@ -126,7 +124,7 @@ bool TimescaleWriter::insert_orderbook(const json& msg) {
                 << "'bid', "
                 << price << ", "
                 << size << ", "
-                << uid << ", "
+                << update_id << ", "               // reuse message-level update_id for every row
                 << (is_snapshot ? "true" : "false") << ", "
                 << seq << ");";
             if (!exec(sql.str())) return false;
@@ -134,9 +132,8 @@ bool TimescaleWriter::insert_orderbook(const json& msg) {
 
         // Insert asks
         for (const auto& level : data["a"]) {
-            double price = level[0].get<double>();
-            double size  = level[1].get<double>();
-            int64_t uid  = level[2].get<int64_t>();
+            double price = std::stod(level[0].get<std::string>());
+            double size  = std::stod(level[1].get<std::string>());
 
             std::ostringstream sql;
             sql << "INSERT INTO orderbook (time, symbol, side, price, size, update_id, is_snapshot, seq) VALUES "
@@ -145,7 +142,7 @@ bool TimescaleWriter::insert_orderbook(const json& msg) {
                 << "'ask', "
                 << price << ", "
                 << size << ", "
-                << uid << ", "
+                << update_id << ", "
                 << (is_snapshot ? "true" : "false") << ", "
                 << seq << ");";
             if (!exec(sql.str())) return false;

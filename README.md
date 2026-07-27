@@ -191,6 +191,9 @@ docker compose logs -f ingestion
 
 # Rebuild
 docker compose build ingestion
+
+# All in one
+docker compose up -d --build --force-recreate ingestion
 ```
 
 ## Configuration
