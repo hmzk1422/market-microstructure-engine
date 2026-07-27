@@ -84,7 +84,7 @@ int main() {
         // Define highly liquid instruments for cross-margin or funding-rate arbitrage.
         // BTCUSDT  = USDT-Margined Perpetual
         // BTC-PERP = USDC-Margined Perpetual
-        const std::vector<std::string> symbols = {"BTCUSDT", "BTC-PERP"};
+        const std::vector<std::string> symbols = {"BTCUSDT", "BTCPERP"};
         const int depth = 50;
 
         // Connect to TimescaleDB.
