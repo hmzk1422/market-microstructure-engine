@@ -1,0 +1,48 @@
+{
+    "comment": "Market Microstructure Ingestion Engine - Configuration File",
+
+    "_bybit_connection": "Bybit WebSocket connection settings",
+    "bybit_ws_url": "wss://stream.bybit.com/v5/public/linear",
+    "bybit_ws_url_private": "wss://stream.bybit.com/v5/private",
+
+    "_subscriptions": "Data streams to subscribe to",
+    "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+    "subscribe_orderbook": true,
+    "subscribe_trades": true,
+    "subscribe_ticker": true,
+    "subscribe_kline": true,
+    "kline_intervals": ["1m", "5m", "15m", "30m", "1h", "4h"],
+    "orderbook_depth": 50,
+
+    "_websocket": "WebSocket connection parameters",
+    "ws_ping_interval_sec": 20,
+    "ws_timeout_sec": 30,
+    "ws_max_reconnect_attempts": 0,
+    "ws_reconnect_initial_delay_ms": 1000,
+    "ws_reconnect_max_delay_ms": 60000,
+
+    "_pipeline": "Data processing pipeline settings",
+    "pipeline_queue_size": 100000,
+    "pipeline_flush_interval_ms": 100,
+    "pipeline_batch_size": 1000,
+    "enable_checksum_verification": true,
+    "enable_sequence_gap_detection": true,
+
+    "_database": "SQLite database settings",
+    "db_path": "data/market_data.db",
+    "db_journal_mode": "WAL",
+    "db_pool_size": 4,
+    "db_busy_timeout_ms": 5000,
+    "db_enable_foreign_keys": true,
+
+    "_logging": "Logging configuration",
+    "log_dir": "logs",
+    "log_level": "info",
+    "log_max_file_size_mb": 100,
+    "log_max_files": 10,
+
+    "_monitoring": "Metrics and health monitoring",
+    "metrics_port": 9090,
+    "enable_metrics": true,
+    "health_check_interval_sec": 10
+}
