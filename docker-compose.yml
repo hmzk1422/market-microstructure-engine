@@ -1,0 +1,66 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: market-timescaledb
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=market_data
+      - POSTGRES_USER=market
+      - POSTGRES_PASSWORD=market
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U market -d market_data"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ingestion:
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: market-ingestion
+    restart: unless-stopped
+    ports:
+      - "9090:9090"  # Metrics
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # NOTE: If you do not have a config.json file in your project folder, 
+      # comment out the next line or Docker will crash during startup!
+      - ./config.json:/app/config.json:ro
+    environment:
+      - BYBIT_API_KEY=${BYBIT_API_KEY}
+      - BYBIT_API_SECRET=${BYBIT_API_SECRET}
+      - TIMESCALE_CONN=${TIMESCALE_CONN:-host=timescaledb port=5432 dbname=market_data user=market password=market}
+      - INGESTION_LOG_LEVEL=${INGESTION_LOG_LEVEL:-info}
+      - INGESTION_SYMBOLS=${INGESTION_SYMBOLS:-BTCUSDT,ETHUSDT}
+      - TZ=UTC
+    healthcheck:
+      test: ["CMD", "/app/ws_ingestion", "--help"] # FIXED name here
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: "2G"
+        reservations:
+          cpus: "0.5"
+          memory: "512M"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+volumes:
+  timescaledb_data:

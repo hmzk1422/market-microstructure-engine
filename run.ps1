@@ -1,0 +1,1 @@
+Get-Content .env | ForEach-Object { $name, $value = $_.Split('=', 2); Set-Item -Path "Env:$name" -Value $value }; .\Release\ws_ingestion.exe
