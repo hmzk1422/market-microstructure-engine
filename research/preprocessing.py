@@ -1,7 +1,33 @@
 import pandas as pd
 from sqlalchemy import create_engine
+import numpy as np
 
 DB_URL = "postgresql://market:market@localhost:5433/market_data"
+
+# =====================================================================
+# 1. DATA INGESTION & SIGNAL CONSTRUCTION
+#    (unchanged from the existing pipeline — kept here for completeness)
+# =====================================================================
+
+def prepare_signals(df, window=1000, max_staleness_ms=100, min_vol_usd=1.0):
+    df = df.copy()
+    df['feed_latency_ms'] = (df['perp_time'] - df['spot_time']).abs().dt.total_seconds() * 1000.0
+    df['is_stale'] = df['feed_latency_ms'] > max_staleness_ms
+
+    df['perp_mid'] = (df['perp_bid'] + df['perp_ask']) / 2.0
+    df['spot_mid'] = (df['spot_bid'] + df['spot_ask']) / 2.0
+    df['mid_spread'] = df['perp_mid'] - df['spot_mid']
+
+    df['exec_short_spread'] = df['perp_bid'] - df['spot_ask']   # sell perp / buy spot
+    df['exec_long_spread'] = df['perp_ask'] - df['spot_bid']    # buy perp / sell spot
+
+    rolling_med = df['mid_spread'].rolling(window=window, min_periods=window // 2).median()
+    rolling_mad = (df['mid_spread'] - rolling_med).abs().rolling(window=window, min_periods=window // 2).median()
+    scale = np.maximum(rolling_mad * 1.4826, min_vol_usd)
+    df['z_score'] = (df['mid_spread'] - rolling_med) / scale
+    df.loc[df['is_stale'], 'z_score'] = 0.0
+    return df
+
 
 def reconstruct_continuous_book(symbol, limit=10000000):
     engine = create_engine(DB_URL)
