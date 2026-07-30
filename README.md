@@ -196,6 +196,18 @@ docker compose build ingestion
 docker compose up -d --build --force-recreate ingestion
 ```
 
+### Simulator
+```
+# 1. Run static analysis (Phase 1)
+python research/liquidity_capacity.py
+
+# 2. Run dynamic simulation (Phase 2)
+python research/liquidity_capacity_dynamic.py
+
+# 3. Open the notebook for visualization
+jupyter notebook research/liquidity_capacity_analysis.ipynb
+```
+
 ## Configuration
 
 ### config.json
@@ -306,3 +318,10 @@ DB stats | trades=50000 | snaps=100 | deltas=50000 | tickers=50000 | klines=5000
 ## License
 
 MIT License — see LICENSE file for details.
+
+@article{berti2025trades,
+  title={TRADES: Generating Realistic Market Simulations with Diffusion Models},
+  author={Berti, Leonardo and Prenkaj, Bardh and Velardi, Paola},
+  journal={arXiv preprint arXiv:2502.07071},
+  year={2025}
+}
