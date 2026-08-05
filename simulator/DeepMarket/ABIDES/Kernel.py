@@ -6,8 +6,14 @@ from message.Message import MessageType
 
 from util.util import log_print
 from util.plotting import liquidity_telemetry
-from main import plot_graphs
-from evaluation.quantitative_eval import predictive_lstm
+try:
+    from main import plot_graphs
+except ImportError:
+    pass
+try:
+    from evaluation.quantitative_eval import predictive_lstm
+except ImportError:
+    pass
 
 class Kernel:
 
@@ -318,20 +324,26 @@ class Kernel:
       print ("{}: {:d}".format(a, int(round(value / count))))
 
     print ("Simulation ending!")
-    stock_name = self.log_dir.split("_")[2]
-    date = self.log_dir.split("_")[3]
-    time = self.log_dir.split("_")[4]
-    path = os.path.join(os.getcwd(), "ABIDES", "log", self.log_dir)
-    liquidity_telemetry.main(
-      exchange_path=path+"/EXCHANGE_AGENT.bz2", 
-      ob_path=path+f"/ORDERBOOK_{stock_name}_FULL.bz2", 
-      outfile=path+"/world_agent_sim.png", 
-      plot_config="ABIDES/util/plotting/configs/plot_09.30_12.00.json"
-    )
-    real_data_path = os.path.join(os.getcwd(), "ABIDES", "log", "paper", f"market_replay_{stock_name}_{date}_{time}", "processed_orders.csv")
-    trades_data_path = os.path.join(os.getcwd(), "ABIDES", "log", self.log_dir, "processed_orders.csv")
-    #plot_graphs(real_data_path, trades_data_path, trades_data_path, trades_data_path)
-    #predictive_lstm.main(real_data_path, trades_data_path)
+    # Post-simulation telemetry/plotting is optional and only works for
+    # ABIDES stock-market log dirs (e.g. "marketreplay_AAPL_20200101_000000").
+    # Wrap in try/except so custom log dirs (e.g. "abides_log_...") don't crash.
+    try:
+      stock_name = self.log_dir.split("_")[2]
+      date = self.log_dir.split("_")[3]
+      time = self.log_dir.split("_")[4]
+      path = os.path.join(os.getcwd(), "ABIDES", "log", self.log_dir)
+      liquidity_telemetry.main(
+        exchange_path=path+"/EXCHANGE_AGENT.bz2", 
+        ob_path=path+f"/ORDERBOOK_{stock_name}_FULL.bz2", 
+        outfile=path+"/world_agent_sim.png", 
+        plot_config="ABIDES/util/plotting/configs/plot_09.30_12.00.json"
+      )
+      real_data_path = os.path.join(os.getcwd(), "ABIDES", "log", "paper", f"market_replay_{stock_name}_{date}_{time}", "processed_orders.csv")
+      trades_data_path = os.path.join(os.getcwd(), "ABIDES", "log", self.log_dir, "processed_orders.csv")
+      #plot_graphs(real_data_path, trades_data_path, trades_data_path, trades_data_path)
+      #predictive_lstm.main(real_data_path, trades_data_path)
+    except Exception as e:
+      print(f"Post-simulation telemetry skipped: {e}")
     return self.custom_state
 
 

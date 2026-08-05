@@ -8,7 +8,13 @@ from util.formatting.convert_order_book import process_orderbook, is_wide_book
 from util.formatting.convert_order_stream import convert_stream_to_format
 import itertools
 from bisect import bisect
-from matplotlib.cm import get_cmap
+try:
+    from matplotlib.cm import get_cmap
+except ImportError:
+    from matplotlib import colormaps
+    def get_cmap(name=None):
+        return colormaps.get_cmap(name) if name else colormaps
+
 import os
 import warnings
 from util.util import get_value_from_timestamp

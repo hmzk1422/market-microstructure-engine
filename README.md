@@ -206,7 +206,30 @@ python research/liquidity_capacity_dynamic.py
 
 # 3. Open the notebook for visualization
 jupyter notebook research/liquidity_capacity_analysis.ipynb
+
+# 4. Running ABIDES simulator (For limit orders)
+cd simulator\DeepMarket\ABIDES
+python config\crypto_limit_order_sim.py
 ```
+```
+# From the project root:
+cd simulator/DeepMarket/ABIDES
+
+# Full grid (all sizes at once) - quick test with 100k events:
+python config/crypto_limit_order_sim.py
+
+# Single qty (clean independent test - recommended for accurate scalability):
+python config/crypto_limit_order_sim.py --qty 0.5
+
+# Larger data slice:
+python config/crypto_limit_order_sim.py --event-limit 1000000
+```
+
+## How Simulator Works
+Three custom addition to DeepMarkets to fulfill our goal:
+- CryptoReplayAgent.py: Replaying historical L2 data from TimescaleDB into the ExchangeAgent instead of using neural network to generate orders.
+- ArbitrageLimitOrderAgent.py: The perp-spot arbitrage strategy agent.
+- crypto_limit_order_sim.py: Config file running both.
 
 ## Configuration
 

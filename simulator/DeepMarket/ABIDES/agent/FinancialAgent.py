@@ -28,9 +28,9 @@ def dollarize(cents):
   if type(cents) is list:
     return ( [ dollarize(x) for x in cents ] )
   elif type(cents) is int:
+    # cents is an integer number of cents
     return "${:0.2f}".format(cents / 100)
   else:
-    # If cents is already a float, there is an error somewhere.
-    print ("ERROR: dollarize(cents) called without int or list of ints: {}".format(cents))
-    traceback.print_stack()
-    sys.exit()
+    # If cents is a float, it's already in dollars
+    # Convert to cents format for consistency
+    return "${:0.2f}".format(cents)

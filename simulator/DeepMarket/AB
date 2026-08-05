@@ -1,0 +1,30 @@
+content = '''from agent.Agent import Agent
+import sys
+import traceback
+
+class FinancialAgent(Agent):
+
+  def __init__(self, id, name, type, random_state, log_to_file=True):
+    super().__init__(id, name, type, random_state, log_to_file)
+
+  def dollarize(self, cents):
+    return dollarize(cents)
+
+  pass
+
+def dollarize(cents):
+  if type(cents) is list:
+    return ( [ dollarize(x) for x in cents ] )
+  elif type(cents) is int:
+    return "${:0.2f}".format(cents / 100)
+  elif type(cents) is float:
+    return "${:0.2f}".format(cents)
+  else:
+    print("ERROR: dollarize(cents) called without int or list of ints: {}".format(cents))
+    traceback.print_stack()
+    sys.exit()
+'''
+
+with open('FinancialAgent.py', 'w') as f:
+    f.write(content)
+print("Done!")

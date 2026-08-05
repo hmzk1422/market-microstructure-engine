@@ -65,39 +65,31 @@ class OrderBook:
 
         matching = True
 
-        self.prettyPrint()
-
         executed = []
 
         while matching:
-            matched_order = deepcopy(self.executeOrder(order))
+            matched_order = self.executeOrder(order)
 
             if matched_order:
                 # Decrement quantity on new order and notify traders of execution.
-                filled_order = deepcopy(order)
-                filled_order.quantity = matched_order.quantity
-                filled_order.fill_price = matched_order.fill_price
+                order.quantity -= matched_order.quantity
 
-                order.quantity -= filled_order.quantity
-
-                log_print("MATCHED: new order {} vs old order {}", filled_order, matched_order)
-                log_print("SENT: notifications of order execution to agents {} and {} for orders {} and {}",
-                          filled_order.agent_id, matched_order.agent_id, filled_order.order_id, matched_order.order_id)
+                log_print("MATCHED: new order {} vs old order {}", order.order_id, matched_order.order_id)
 
                 #self.owner.sendMessage(order.agent_id, Message({"msg": "ORDER_EXECUTED", "order": filled_order}))
                 self.owner.sendMessage(matched_order.agent_id, Message({"msg": "ORDER_EXECUTED", "order": matched_order}))
 
                 # Accumulate the volume and average share price of the currently executing inbound trade.
-                executed.append((filled_order.quantity, filled_order.fill_price))
+                executed.append((matched_order.quantity, matched_order.fill_price))
                 self.owner.publishOrderBookData()
                 if order.quantity <= 0:
                     matching = False
 
             else:
                 # No matching order was found, so the new order enters the order book.  Notify the agent.
-                self.enterOrder(deepcopy(order))
+                self.enterOrder(order)
 
-                log_print("ACCEPTED: new order {}", order)
+                log_print("ACCEPTED: new order {}", order.order_id)
                 log_print("SENT: notifications of order acceptance to agent {} for order {}",
                           order.agent_id, order.order_id)
 
@@ -107,15 +99,17 @@ class OrderBook:
 
         if not matching:
             # Now that we are done executing or accepting this order, log the new best bid and ask.
-            if self.bids:
-                self.owner.logEvent('BEST_BID', "{},{},{}".format(self.symbol,
-                                                                  self.bids[0][0].limit_price,
-                                                                  sum([o.quantity for o in self.bids[0]])))
+            # Only log (and compute the expensive sum) if book archival is enabled.
+            if self.owner.book_freq is not None:
+                if self.bids:
+                    self.owner.logEvent('BEST_BID', "{},{},{}".format(self.symbol,
+                                                                      self.bids[0][0].limit_price,
+                                                                      sum([o.quantity for o in self.bids[0]])))
 
-            if self.asks:
-                self.owner.logEvent('BEST_ASK', "{},{},{}".format(self.symbol,
-                                                                  self.asks[0][0].limit_price,
-                                                                  sum([o.quantity for o in self.asks[0]])))
+                if self.asks:
+                    self.owner.logEvent('BEST_ASK', "{},{},{}".format(self.symbol,
+                                                                      self.asks[0][0].limit_price,
+                                                                      sum([o.quantity for o in self.asks[0]])))
 
             # Also log the last trade (total share quantity, average share price).
             if executed:
@@ -154,7 +148,6 @@ class OrderBook:
                     self.quotes_seen.add(quote)
                 self.book_log.append(row)
         self.last_update_ts = self.owner.currentTime
-        self.prettyPrint()
 
     def handleMarketOrder(self, order):
 
@@ -229,10 +222,18 @@ class OrderBook:
 
             else:
                 # Consumed only part of matched order.
-                matched_order = deepcopy(book[0][0])
-                matched_order.quantity = order.quantity
-
-                book[0][0].quantity -= matched_order.quantity
+                matched_order = LimitOrder(
+                    book[0][0].agent_id,
+                    book[0][0].time_placed,
+                    book[0][0].symbol,
+                    order.quantity,
+                    book[0][0].is_buy_order,
+                    book[0][0].limit_price,
+                    book[0][0].order_id,
+                    book[0][0].tag
+                )
+                matched_order.fill_price = matched_order.limit_price
+                book[0][0].quantity -= order.quantity
 
             # When two limit orders are matched, they execute at the price that
             # was being "advertised" in the order book.
@@ -372,6 +373,146 @@ class OrderBook:
             self.asks = book
         self.last_update_ts = self.owner.currentTime
 
+    # Set the total quantity at a specific price level directly, WITHOUT sending
+    # ORDER_ACCEPTED/ORDER_CANCELLED confirmations to the replay agent.
+    # Used by replay/market-maker agents that control the resting liquidity.
+    # This bypasses the kernel message queue for the replay agent's OWN events.
+    #
+    # CRITICAL: if the newly-set level would CROSS any resting orders owned by
+    # OTHER agents (e.g. the arbitrage agent), those orders are matched and
+    # ORDER_EXECUTED messages are sent to their owners. This preserves fill
+    # detection for other agents while keeping replay noise at zero.
+    #   side: 'bid' or 'ask'
+    #   price: the price level
+    #   quantity: new total quantity (0 to remove the level)
+    #   order_id: the id to tag the resting order with
+    def setLevel(self, side, price, quantity, order_id):
+        book = self.bids if side == 'bid' else self.asks
+        price = float(price)
+        is_buy = (side == 'bid')
+
+        # Find the target level
+        idx = None
+        for i, level in enumerate(book):
+            if level and level[0].limit_price == price:
+                idx = i
+                break
+
+        if quantity <= 0:
+            # Remove the level
+            if idx is not None:
+                del book[idx]
+        else:
+            if idx is not None:
+                # Replace the level's quantity with a single order of 'quantity'
+                # (keeps ONE order per level for O(1) sizes)
+                lvl = book[idx]
+                # If the existing order has the same id, update its quantity
+                if lvl and lvl[0].order_id == order_id:
+                    lvl[0].quantity = quantity
+                else:
+                    # Replace with a fresh order (preserving FIFO: new order goes
+                    # to the back of the level list)
+                    lvl.append(LimitOrder(
+                        self.owner.id, self.owner.currentTime, self.symbol,
+                        quantity, is_buy, price, order_id
+                    ))
+            else:
+                # Insert a new level in sorted order
+                new_order = LimitOrder(
+                    self.owner.id, self.owner.currentTime, self.symbol,
+                    quantity, is_buy, price, order_id
+                )
+                if not book:
+                    book.append([new_order])
+                else:
+                    # Insert maintaining price ordering: bids descending, asks ascending
+                    for pos, level in enumerate(book):
+                        lvl_price = level[0].limit_price
+                        if is_buy:
+                            if price > lvl_price:
+                                book.insert(pos, [new_order])
+                                break
+                        else:
+                            if price < lvl_price:
+                                book.insert(pos, [new_order])
+                                break
+                    else:
+                        book.append([new_order])
+
+        # After mutating the book, check for crosses with OTHER agents' resting orders.
+        # A new bid at price P should fill resting asks at price <= P (if any).
+        # A new ask at price P should fill resting bids at price >= P (if any).
+        # Only match orders NOT owned by self.owner (the replay agent's own orders
+        # are the market-maker side and should never "fill themselves").
+        if is_buy:
+            opp_book = self.asks
+            # Find resting asks at price <= price
+            for oi in range(len(opp_book) - 1, -1, -1):
+                level = opp_book[oi]
+                if not level:
+                    continue
+                lvl_price = level[0].limit_price
+                if lvl_price > price:
+                    continue  # asks sorted ascending; from top (worst) down
+                # This level is crossed: fill against the new bid quantity
+                self._fill_crossed_level(level, quantity, lvl_price, is_buy=True)
+                if not level:
+                    opp_book.pop(oi)
+                # Continue to next level (may have more quantity)
+        else:
+            opp_book = self.bids
+            # Find resting bids at price >= price
+            for oi in range(len(opp_book) - 1, -1, -1):
+                level = opp_book[oi]
+                if not level:
+                    continue
+                lvl_price = level[0].limit_price
+                if lvl_price < price:
+                    continue  # bids sorted descending; from bottom (worst) up
+                # This level is crossed: fill against the new ask quantity
+                self._fill_crossed_level(level, quantity, lvl_price, is_buy=False)
+                if not level:
+                    opp_book.pop(oi)
+
+        self.last_update_ts = self.owner.currentTime
+
+    def _fill_crossed_level(self, level, aggressor_qty, price, is_buy):
+        """Match a booked level against an aggressor order of given quantity.
+        Only fills orders NOT owned by self.owner. Sends ORDER_EXECUTED to the
+        owners of filled orders. The aggressor quantity is consumed across the
+        level's orders FIFO. Note: the aggressor (our replay order) quantity is
+        reduced by fills; we do NOT need to update it further because a crossed
+        replay order means the level effectively vanished (setLevel semantics)."""
+        # level is a list of LimitOrders at one price.
+        # Iterate FIFO and fill orders not owned by this OrderBook's owner.
+        to_remove = []
+        for order in level:
+            if order.agent_id == self.owner.id:
+                continue  # skip the replay agent's own resting orders
+            if aggressor_qty <= 0:
+                break
+            fill_qty = min(order.quantity, aggressor_qty)
+            # Build the executed order copy (as ABIDES does in executeOrder)
+            filled = LimitOrder(
+                order.agent_id, order.time_placed, order.symbol,
+                fill_qty, order.is_buy_order, order.limit_price,
+                order.order_id, order.tag if hasattr(order, 'tag') else None
+            )
+            filled.fill_price = order.limit_price
+            # Notify the owner of the filled order via the kernel.
+            # Include 'sender' so the ExchangeAgent's receiveMessage logging works.
+            self.owner.sendMessage(order.agent_id,
+                                   Message({"msg": "ORDER_EXECUTED", "order": filled,
+                                            "sender": self.owner.id}))
+            order.quantity -= fill_qty
+            aggressor_qty -= fill_qty
+            if order.quantity <= 0:
+                to_remove.append(order)
+        for o in to_remove:
+            if o in level:
+                level.remove(o)
+
     # Get the inside bid price(s) and share volume available at each price, to a limit
     # of "depth".  (i.e. inside price, inside 2 prices)  Returns a list of tuples:
     # list index is best bids (0 is best); each tuple is (price, total shares).
@@ -397,6 +538,17 @@ class OrderBook:
             book.append((price, qty))
 
         return book
+
+    # Get the total quantity (in base units) at a specific price level on a given
+    # side ('bid' or 'ask'). Returns 0 if the price level does not exist.
+    # This is used by replay agents to determine the ACTUAL book state, accounting
+    # for orders placed by other agents (e.g. arb agents) at the same prices.
+    def getSizeAtPrice(self, side, price):
+        book = self.bids if side == 'bid' else self.asks
+        for level in book:
+            if level and level[0].limit_price == price:
+                return sum(o.quantity for o in level)
+        return 0
 
     def _get_recent_history(self):
         """ Gets portion of self.history that has arrived since last call of self.get_transacted_volume.
