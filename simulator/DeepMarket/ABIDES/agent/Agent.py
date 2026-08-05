@@ -103,10 +103,18 @@ class Agent:
     # often an object, ensures later state changes to the object will not
     # retroactively update the logged event.
 
+    # Fast path: skip entirely if logging is disabled and no summary log needed.
+    if not self.log_to_file and not appendSummaryLog:
+      return
+
     # We can make a single copy of the object (in case it is an arbitrary
     # class instance) for both potential log targets, because we don't
     # alter logs once recorded.
-    e = deepcopy(event)
+    # Skip deepcopy for immutable types (str, int, float, None) for performance.
+    if isinstance(event, (str, int, float, type(None))):
+      e = event
+    else:
+      e = deepcopy(event)
     self.log.append({ 'EventTime' : self.currentTime, 'EventType' : eventType,
                       'Event' : e })
 

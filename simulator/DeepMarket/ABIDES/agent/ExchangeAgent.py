@@ -24,9 +24,10 @@ from copy import deepcopy
 class ExchangeAgent(FinancialAgent):
 
   def __init__(self, id, name, type, mkt_open, mkt_close, symbols, book_freq='S', wide_book=False, pipeline_delay = 40000,
-               computation_delay = 1, stream_history = 0, log_orders = False, random_state = None):
+               computation_delay = 1, stream_history = 0, log_orders = False, random_state = None,
+               log_to_file = True):
 
-    super().__init__(id, name, type, random_state)
+    super().__init__(id, name, type, random_state, log_to_file)
 
     # Do not request repeated wakeup calls.
     self.reschedule = False
@@ -147,7 +148,8 @@ class ExchangeAgent(FinancialAgent):
     if msg.body['msg'] in ['LIMIT_ORDER', 'MARKET_ORDER', 'CANCEL_ORDER', 'MODIFY_ORDER']:
       if self.log_orders: self.logEvent(msg.body['msg'], msg.body['order'].to_dict())
     else:
-      self.logEvent(msg.body['msg'], msg.body['sender'])
+      # Some messages (e.g. ORDER_EXECUTED from setLevel) may not have 'sender'.
+      self.logEvent(msg.body['msg'], msg.body.get('sender', ''))
 
     # Handle the DATA SUBSCRIPTION request and cancellation messages from the agents.
     if msg.body['msg'] in ["MARKET_DATA_SUBSCRIPTION_REQUEST", "MARKET_DATA_SUBSCRIPTION_CANCELLATION"]:
@@ -239,7 +241,7 @@ class ExchangeAgent(FinancialAgent):
         log_print("Limit Order discarded.  Unknown symbol: {}", order.symbol)
       else:
         # Hand the order to the order book for processing.
-        self.order_books[order.symbol].handleLimitOrder(deepcopy(order))
+        self.order_books[order.symbol].handleLimitOrder(order)
         #self.publishOrderBookData()
     elif msg.body['msg'] == "MARKET_ORDER":
       order = msg.body['order']
@@ -299,6 +301,9 @@ class ExchangeAgent(FinancialAgent):
     2) order book update timestamp > last time agent was updated AND the orderbook update time stamp is greater than
     the last agent update time stamp by a period more than that specified in the freq parameter.
     '''
+    # Fast path: skip entirely if no subscribers (common case for crypto replay sims)
+    if not self.subscription_dict:
+      return
     for agent_id, params in self.subscription_dict.items():
       for symbol, values in params.items():
         levels, freq, last_agent_update = values[0], values[1], values[2]

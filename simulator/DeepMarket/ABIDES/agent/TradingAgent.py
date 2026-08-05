@@ -583,9 +583,9 @@ class TradingAgent(FinancialAgent):
     
     for symbol, shares in holdings.items():
       if symbol == 'CASH': continue
-      if self.last_trade[symbol] is None:
-        self.logEvent('MARKED_TO_MARKET', cash)
-        return cash
+      # Only mark to market if we have a last trade price for this symbol
+      if symbol not in self.last_trade or self.last_trade[symbol] is None:
+        continue
       if use_midpoint:
         bid, ask, midpoint = self.getKnownBidAskMidpoint(symbol)
         if bid is None or ask is None or midpoint is None:
