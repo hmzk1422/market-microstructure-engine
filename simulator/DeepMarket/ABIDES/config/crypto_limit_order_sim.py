@@ -43,7 +43,7 @@ from liquidity_capacity import reconstruct_book_with_depth
 DB_URL = "postgresql://market:market@localhost:5433/market_data"
 PERP_SYMBOL = "BTCPERP"
 SPOT_SYMBOL = "BTCUSDT"
-EVENT_LIMIT = 100000
+EVENT_LIMIT = 500000  # 5x more data for better statistics
 SEED = 42
 
 # Full qty grid (in BTC)
@@ -219,10 +219,12 @@ def main():
         log_orders=False,
         log_to_file=False,
         random_state=np.random.RandomState(seed=SEED+3),
-        entry_z=2.0,
+        entry_z=1.5,  # Lowered from 2.0 - more signals, realistic for statarb
         qty_grid_btc=qty_grid,
-        max_wait_sec=5.0,
-        fee_bps=0.0002
+        max_wait_sec=30.0,  # Maker leg timeout
+        maker_fee_bps=0.0002,  # 0.02% - passive limit orders
+        taker_fee_bps=0.0005,  # 0.05% - aggressive market orders
+        execution_latency_ms=100.0  # Realistic co-located latency
     )
     agents.append(arb_agent)
     agent_types.append("ArbitrageLimitOrderAgent")

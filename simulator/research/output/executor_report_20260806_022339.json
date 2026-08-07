@@ -1,0 +1,134 @@
+{
+  "timestamp": "20260806_022339",
+  "simulation_file": "DeepMarket\\ABIDES\\research\\data\\limit_order_qty_50.0.parquet",
+  "n_records": 9064,
+  "fee_hurdle_analysis": {
+    "perp_spot_same_exchange": {
+      "perp_fee": 59.99999999999999,
+      "spot_fee": 59.99999999999999,
+      "funding_cost": 1.1407711613050422,
+      "withdrawal_cost": 0.0,
+      "total_hurdle_usd": 121.14077116130503,
+      "total_hurdle_bps": 12.114077116130503
+    },
+    "cex_to_cex": {
+      "venue_a_fee": 20.0,
+      "venue_b_fee": 10.0,
+      "venue_a_withdrawal": 0.0,
+      "venue_b_withdrawal": 0.0,
+      "total_hurdle_usd": 30.0,
+      "total_hurdle_bps": 2.9999999999999996
+    },
+    "cex_to_dex": {
+      "cex_taker_fee": 50.0,
+      "dex_swap_fee": 29.999999999999996,
+      "gas_cost": 450.0,
+      "total_hurdle_usd": 530.0,
+      "total_hurdle_bps": 53.0
+    },
+    "observed_net_spread": {
+      "mean_bps": -300.5916933333371,
+      "median_bps": -102.92344,
+      "std_bps": 512.4783161072897,
+      "min_bps": -1196.809260000006,
+      "max_bps": 78.03887999999273
+    }
+  },
+  "decay_analysis": {
+    "n_signals": 9064,
+    "n_filled": 9,
+    "ttf_metrics": {
+      "n_filled": 9,
+      "ttf_mean_ms": 6050.666666666667,
+      "ttf_median_ms": 701.0,
+      "ttf_p25_ms": 220.0,
+      "ttf_p75_ms": 2560.0,
+      "ttf_p95_ms": 27631.999999999985,
+      "ttf_max_ms": 41200.0,
+      "ttf_min_ms": 181.0
+    },
+    "fill_by_size": [
+      {
+        "qty_btc": 50.0,
+        "n_signals": 9064,
+        "n_filled": 9,
+        "fill_rate": 0.0009929390997352162
+      }
+    ]
+  },
+  "liquidity_capacity": {
+    "n_total_signals": 9064,
+    "n_filled": 9,
+    "fee_hurdle_bps": 4.0,
+    "fill_rate": 0.0009929390997352162,
+    "by_order_size": [
+      {
+        "qty_btc": 50.0,
+        "n_signals": 9064,
+        "n_filled": 9,
+        "fill_rate": 0.0009929390997352162,
+        "avg_net_spread": -300.5916933333371,
+        "median_net_spread": -102.92344,
+        "profitable_rate": 0.3333333333333333,
+        "avg_ttf_sec": 6.072777777777778,
+        "median_ttf_sec": 0.701
+      }
+    ],
+    "capacity_analysis": {
+      "max_profitable_size_btc": NaN,
+      "note": "Requires liquidity snapshot data for precise calculation"
+    },
+    "market_impact_coefficient": {
+      "a": NaN,
+      "b": NaN,
+      "r_squared": 0.0
+    }
+  },
+  "research_questions": {
+    "RQ1": {
+      "question": "What is the empirical decay rate and half-life of cross-exchange price discrepancies?",
+      "findings": {
+        "time_to_fill_median_ms": 701.0,
+        "time_to_fill_mean_ms": 6050.666666666667,
+        "time_to_fill_p95_ms": 27631.999999999985,
+        "note": "Half-life estimated from time-to-fill distribution"
+      }
+    },
+    "RQ2": {
+      "question": "How do dynamic fee hurdles determine optimal net-of-fee entry thresholds?",
+      "findings": {
+        "perp_spot_same_exchange_bps": 12.114077116130503,
+        "cex_cex_bps": 2.9999999999999996,
+        "cex_dex_bps": 53.0,
+        "observed_net_spread": {
+          "mean_bps": -300.5916933333371,
+          "median_bps": -102.92344,
+          "std_bps": 512.4783161072897,
+          "min_bps": -1196.809260000006,
+          "max_bps": 78.03887999999273
+        }
+      }
+    },
+    "RQ3": {
+      "question": "What are the effective capital capacity limits?",
+      "findings": {
+        "max_profitable_size_btc": 0.0,
+        "profitable_sizes": [],
+        "capacity_curve": [
+          {
+            "qty_btc": 50.0,
+            "n_signals": 9064,
+            "n_filled": 9,
+            "fill_rate": 0.0009929390997352162,
+            "avg_net_spread": -300.5916933333371,
+            "median_net_spread": -102.92344,
+            "profitable_rate": 0.3333333333333333,
+            "avg_ttf_sec": 6.072777777777778,
+            "median_ttf_sec": 0.701
+          }
+        ],
+        "note": "Based on 50% profitability threshold"
+      }
+    }
+  }
+}

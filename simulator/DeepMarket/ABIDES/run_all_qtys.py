@@ -16,10 +16,14 @@ import pandas as pd
 # Qty sizes to test
 QTY_SIZES = [0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 25.0, 50.0, 100.0]
 
+# Use venv Python explicitly to ensure subprocess inherits the virtual environment
+import sys
+VENV_PYTHON = sys.executable
+
 # Base config command
 BASE_CMD = [
-    "python", "config/crypto_limit_order_sim.py",
-    "--event-limit", "100000"
+    VENV_PYTHON, "config/crypto_limit_order_sim.py",
+    "--event-limit", "1000000"
 ]
 
 # Output directory for individual runs
