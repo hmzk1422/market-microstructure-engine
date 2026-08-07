@@ -1,0 +1,6 @@
+numpy>=1.24.0
+pandas>=1.5.0
+scipy>=1.9.0
+pyarrow>=10.0.0
+fastparquet>=0.8.0
+python-dateutil>=2.8.0
