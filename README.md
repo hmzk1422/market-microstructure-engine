@@ -2,7 +2,7 @@
 Professional-grade C++ pipeline for real-time Bybit WebSocket ingestion, coupled with a Verilated SystemVerilog hardware accelerator for ultra-low-latency spread detection, and a Python-based quantitative research simulator.
 
 ## Architecture
-```Mermaid
+```mermaid
 flowchart TD
     subgraph Python ["Python Research & DeepMarket Simulator"]
         direction LR
@@ -15,7 +15,7 @@ flowchart TD
     end
 ```
 Flow:  
-```Mermaid
+```mermaid
 sequenceDiagram
     autonumber
     participant Exchange as Fiber Exchange
