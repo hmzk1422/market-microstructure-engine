@@ -9,7 +9,7 @@ if(WIN32)
 endif()
 
 # Find software dependencies
-find_package(Boost REQUIRED COMPONENTS system)
+find_package(Boost REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(PostgreSQL REQUIRED)
 find_package(nlohmann_json REQUIRED)
@@ -17,6 +17,7 @@ find_package(nlohmann_json REQUIRED)
 # Find Verilator for hardware co-simulation
 find_package(verilator HINTS $ENV{VERILATOR_ROOT} REQUIRED)
 
+add_library(spread_detector STATIC)
 # 1. Verilate the SystemVerilog spread detector into C++ classes
 verilate(spread_detector
     SOURCES
@@ -36,7 +37,7 @@ add_executable(ws_ingestion
 
 # 3. Link software libraries AND the Verilated hardware module
 target_link_libraries(ws_ingestion PRIVATE
-    Boost::system
+    Boost::boost
     OpenSSL::SSL
     OpenSSL::Crypto
     PostgreSQL::PostgreSQL
