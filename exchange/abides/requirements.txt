@@ -1,0 +1,6 @@
+# Dependencies for the Python ABIDES exchange simulator (Unix domain socket backend).
+abides
+numpy
+pandas
+psycopg2-binary
+python-socketio
