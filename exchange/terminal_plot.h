@@ -10,6 +10,14 @@ struct PlotPoint {
     bool  breached; // threshold breached?
 };
 
+/// Position state for the arbitrage strategy.
+struct Position {
+    double entry_price = 0.0;  // scaled units (1e8)
+    double size = 0.0;         // position size
+    bool  is_long = true;      // true = long, false = short
+    bool  open = false;        // is a position open?
+};
+
 /// Real-time terminal plot using ANSI escape codes.
 /// Maintains a rolling window of spread values per symbol and renders
 /// an ASCII sparkline + status line on each refresh.
@@ -20,6 +28,11 @@ public:
     // Add a new data point for a symbol.
     void feed(const std::string& symbol, double spread_scaled,
               bool breached, uint64_t cycles, double latency_ns);
+
+    // Add a new arbitrage signal for a symbol.
+    void feed_arb_signal(const std::string& symbol, bool open,
+                         double zscore_scaled, double entry_price = 0.0,
+                         double exit_price = 0.0, bool closed = false);
 
     // Render the full plot to stdout (call each frame).
     void render() const;
@@ -48,6 +61,12 @@ private:
         uint64_t last_cycles = 0;
         double last_latency_ns = 0.0;
         bool last_breached = false;
+
+        // Arbitrage state
+        Position position;
+        double last_zscore = 0.0;
+        double total_pnl = 0.0;
+        bool last_arb_open = false;
     };
 
     std::vector<std::string> _symbols;
