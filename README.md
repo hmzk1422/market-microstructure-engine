@@ -2,12 +2,7 @@
 Author      : hmzk1422  
 Version     : v1.0.0
 
-Professional-grade C++ pipeline for real-time Bybit WebSocket ingestion, coupled with a Verilated SystemVerilog hardware accelerator for ultra-low-latency spread detection, and a Python-based quantitative research simulator. This is useable as a component in OSADP to stress test execution algorithm and edge durability.
-
-# Architecture
-There are 3 segments: User side (Our strategy), Clearing House (Aggregated liquidity data, execution friction), Adversarial side (MARL agents).
-## User Side
-System Architecture
+## Architecture
 ```mermaid
 flowchart TD
     subgraph Python ["Python Research & DeepMarket Simulator"]
