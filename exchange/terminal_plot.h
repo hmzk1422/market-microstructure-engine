@@ -47,6 +47,9 @@ public:
     // Restore cursor (call once at shutdown).
     static void shutdown_screen();
 
+    static void hide_cursor();
+    static void show_cursor();
+
 private:
     int _width;
     int _history;
@@ -76,8 +79,6 @@ private:
     static void clear_screen();
     static void home_cursor();
     static void set_color(int code);
-    static void hide_cursor();
-    static void show_cursor();
 
     // Render helpers
     std::string sparkline(const std::deque<PlotPoint>& hist) const;

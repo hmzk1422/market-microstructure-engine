@@ -23,7 +23,11 @@ public:
 
     int read_packet(std::string& out, std::error_code& ec);
 
+#ifdef _WIN32
+    bool connected() const { return _sock != INVALID_SOCKET; }
+#else
     bool connected() const { return _sock >= 0; }
+#endif
 
     void close();
 

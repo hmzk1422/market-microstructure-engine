@@ -71,8 +71,8 @@ struct Vspread_detector : Verilated {
     void eval() override {
         // Mock RTL evaluation: compute threshold breach from s_axis_tdata.
         // Z-score * 1e8 is fed to RTL; threshold_breached_o fires when
-        // |zscore| >= zscore_threshold (scaled to 1e8 units).
-        const int32_t threshold = static_cast<int32_t>(Config{}.zscore_threshold * 1e8);
+        // |s_axis_tdata| >= threshold_scaled.
+        const int32_t threshold = Config{}.threshold_scaled;
         threshold_breached_o = (std::abs(s_axis_tdata) >= threshold) ? 1 : 0;
     }
 };
