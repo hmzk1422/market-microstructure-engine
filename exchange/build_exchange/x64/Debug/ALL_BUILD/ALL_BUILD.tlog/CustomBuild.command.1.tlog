@@ -1,0 +1,10 @@
+^C:\USERS\HIMASKA\DOCUMENTS\PROJECTS\BUSINESS_PROJECTS\MARKET-MICROSTRUCTURE-ENGINE\EXCHANGE\CMAKELISTS.TXT
+setlocal
+"C:\Program Files (x86)\cmake-3.24.0-rc1-windows-x86_64\bin\cmake.exe" -SC:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/exchange -BC:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/exchange/build_exchange --check-stamp-file C:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/exchange/build_exchange/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

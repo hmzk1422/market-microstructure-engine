@@ -154,19 +154,28 @@ class AbidesExchangeSimulator:
                     spreads[sym] = book.spread()
                 packet = build_packet(1, timestamp_ns, self.symbols, levels,
                                       best_bids, best_asks, spreads)
+            try:
                 if self._clients:
                     self._clients[0].sendall(packet)
-                self._last_send = now
+            except (ConnectionResetError, BrokenPipeError, OSError):
+                pass
+            self._last_send = now
             time.sleep(0.0005)
 
     def _advance_market(self):
         """Lightweight stochastic drift so the spread changes over time."""
         for book in self.books.values():
             drift = (0.5 - random.random()) * 0.05
-            for price in list(book.bids.keys())[:3]:
-                book.bids[price] = max(0.1, book.bids[price] + drift * 2.0)
-            for price in list(book.asks.keys())[:3]:
-                book.asks[price] = max(0.1, book.asks[price] + drift * 2.0)
+            # Vary the spread: shift bids and asks in opposite directions
+            spread_change = (random.random() - 0.5) * 2.0
+            new_bids = {}
+            new_asks = {}
+            for price, size in book.bids.items():
+                new_bids[price - spread_change] = max(0.1, size + drift * 2.0)
+            for price, size in book.asks.items():
+                new_asks[price + spread_change] = max(0.1, size + drift * 2.0)
+            book.bids = new_bids
+            book.asks = new_asks
             if random.random() < 0.001:
                 side = "bid" if random.random() < 0.5 else "ask"
                 base_price = book.best_bid() if side == "bid" else book.best_ask()
@@ -240,10 +249,14 @@ def main():
     print(f"[ABIDES] Symbols: {args.symbols}, depth: {args.depth}, "
           f"interval: {args.interval_us}us")
     sim.start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        sim.stop()
 
 
-if __name__ == "__main__":
-    main()
+# (moved to end of file)
 
 
 
@@ -325,6 +338,7 @@ class OrderBook:
         else:
             self.asks[price] = self.asks.get(price, 0.0) + size
 
+
     def snapshot_dict(self) -> dict:
         return {
             "symbol": self.symbol,
@@ -332,3 +346,7 @@ class OrderBook:
             "asks": {str(p): s for p, s in sorted(self.asks.items())[:self.depth]},
             "spread": self.spread(),
         }
+
+
+if __name__ == "__main__":
+    main()

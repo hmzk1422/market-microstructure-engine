@@ -20,6 +20,11 @@
 
 #pragma once
 
+#include <cmath>
+#include <cstdint>
+
+#include "config.h"
+
 // The Verilated class is the base class for all Verilated modules.
 struct Verilated {
     virtual ~Verilated() = default;
@@ -64,10 +69,10 @@ struct Vspread_detector : Verilated {
     }
 
     void eval() override {
-        // Simulated RTL evaluation: the hardware just sees the current values.
-        // This is a passthrough to the C++ model; the Verilated version
-        // runs the actual RTL simulation.
-        (void)clk; (void)rst_n; (void)s_axis_tvalid; (void)s_axis_tready;
-        (void)s_axis_tdata; (void)threshold_breached_o; (void)current_spread_o;
+        // Mock RTL evaluation: compute threshold breach from s_axis_tdata.
+        // Z-score * 1e8 is fed to RTL; threshold_breached_o fires when
+        // |s_axis_tdata| >= threshold_scaled.
+        const int32_t threshold = Config{}.threshold_scaled;
+        threshold_breached_o = (std::abs(s_axis_tdata) >= threshold) ? 1 : 0;
     }
 };

@@ -5,11 +5,14 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <deque>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <vector>
 
@@ -28,65 +31,103 @@ void signal_handler(int /*sig*/) {
     g_running.store(false);
 }
 
-struct SymbolData {
-    std::string symbol;
-    int64_t best_bid = 0;
-    int64_t best_ask = 0;
-    int64_t spread = 0;
-    bool has_data = false;
-};
+// ---------------------------------------------------------------------------
+// Rolling window for z-score computation (pipeline level, not strategy)
+// ---------------------------------------------------------------------------
+class RollingWindow {
+public:
+    explicit RollingWindow(size_t capacity) : _capacity(capacity) {}
 
-bool parse_packet(const std::string& payload,
-                  std::vector<SymbolData>& out_symbols) {
-    const char* ptr = payload.data();
-    const char* end = payload.data() + payload.size();
-
-    if (static_cast<size_t>(end - ptr) < 4) return false;
-    uint32_t num_symbols = *reinterpret_cast<const uint32_t*>(ptr);
-    ptr += 4;
-
-    out_symbols.clear();
-    out_symbols.reserve(num_symbols);
-
-    for (uint32_t i = 0; i < num_symbols; ++i) {
-        SymbolData sd;
-
-        if (static_cast<size_t>(end - ptr) < 16) return false;
-        sd.symbol.assign(ptr, 16);
-        auto null_pos = sd.symbol.find('\0');
-        if (null_pos != std::string::npos) {
-            sd.symbol.resize(null_pos);
+    void push_back(double value) {
+        _data.push_back(value);
+        if (_data.size() > _capacity) {
+            _data.pop_front();
         }
-        ptr += 16;
-
-        if (static_cast<size_t>(end - ptr) < 4) return false;
-        uint32_t num_levels = *reinterpret_cast<const uint32_t*>(ptr);
-        ptr += 4;
-        (void)num_levels;
-
-        if (static_cast<size_t>(end - ptr) < 24) return false;
-        sd.best_bid = *reinterpret_cast<const int64_t*>(ptr);
-        ptr += 8;
-        sd.best_ask = *reinterpret_cast<const int64_t*>(ptr);
-        ptr += 8;
-        sd.spread = *reinterpret_cast<const int64_t*>(ptr);
-        ptr += 8;
-
-        ptr += static_cast<size_t>(num_levels) * 16;
-
-        sd.has_data = true;
-        out_symbols.push_back(std::move(sd));
     }
 
-    return true;
+    size_t size() const { return _data.size(); }
+
+    double mean() const {
+        if (_data.empty()) return 0.0;
+        double sum = 0.0;
+        for (const auto& v : _data) {
+            sum += v;
+        }
+        return sum / static_cast<double>(_data.size());
+    }
+
+    double stddev() const {
+        if (_data.size() < 2) return 0.0;
+        double m = mean();
+        double sq_sum = 0.0;
+        for (const auto& v : _data) {
+            double diff = v - m;
+            sq_sum += diff * diff;
+        }
+        return std::sqrt(sq_sum / static_cast<double>(_data.size() - 1));
+    }
+
+    // z = (current - mean) / std
+    double zscore(double current) const {
+        double m = mean();
+        double s = stddev();
+        if (s == 0.0) return 0.0;
+        return (static_cast<double>(current) - m) / s;
+    }
+
+private:
+    size_t _capacity;
+    std::deque<double> _data;
+};
+
+// ---------------------------------------------------------------------------
+// Symbol data parsed from UDS packet
+// ---------------------------------------------------------------------------
+struct SymbolData {
+    std::string symbol;
+    int32_t spread;       // scaled units (1e8)
+    int32_t best_bid;     // scaled units (1e8)
+    int32_t best_ask;     // scaled units (1e8)
+    int sym_idx = -1;
+};
+
+// Parse a UDS packet line into SymbolData
+// Expected format: "SYMBOL spread best_bid best_ask" (all scaled ints)
+SymbolData parse_packet(const std::string& line, const std::vector<std::string>& symbols) {
+    SymbolData sd;
+    sd.sym_idx = -1;
+
+    size_t pos1 = line.find(' ');
+    if (pos1 == std::string::npos) return sd;
+    sd.symbol = line.substr(0, pos1);
+
+    size_t pos2 = line.find(' ', pos1 + 1);
+    if (pos2 == std::string::npos) return sd;
+    sd.spread = std::stoi(line.substr(pos1 + 1, pos2 - pos1 - 1));
+
+    size_t pos3 = line.find(' ', pos2 + 1);
+    if (pos3 == std::string::npos) return sd;
+    sd.best_bid = std::stoi(line.substr(pos2 + 1, pos3 - pos2 - 1));
+
+    sd.best_ask = std::stoi(line.substr(pos3 + 1));
+
+    for (size_t i = 0; i < symbols.size(); ++i) {
+        if (symbols[i] == sd.symbol) {
+            sd.sym_idx = static_cast<int>(i);
+            break;
+        }
+    }
+
+    return sd;
 }
 
-}  // namespace
+} // namespace
 
 int main(int argc, char** argv) {
-    std::string socket_path = Config{}.socket_path;
-    double clock_hz = Config{}.clock_hz;
-    int32_t threshold_scaled = Config{}.threshold_scaled;
+    // Parse command line arguments
+    std::string socket_path = "/tmp/market_simulator.sock";
+    double clock_hz = 250'000'000.0;
+    int32_t threshold_scaled = 5000;
     std::vector<std::string> symbols = {"BTCUSDT", "ETHUSDT", "SOLUSDT"};
 
     for (int i = 1; i < argc; ++i) {
@@ -96,127 +137,97 @@ int main(int argc, char** argv) {
         } else if (arg == "--clock-hz" && i + 1 < argc) {
             clock_hz = std::stod(argv[++i]);
         } else if (arg == "--threshold" && i + 1 < argc) {
-            threshold_scaled = static_cast<int32_t>(std::stoll(argv[++i]));
-        } else if (arg == "--symbols" && i + 1 < argc) {
-            symbols.clear();
+            threshold_scaled = std::stoi(argv[++i]);
+        } else if (arg == "--symbols") {
             while (i + 1 < argc && argv[i + 1][0] != '-') {
                 symbols.push_back(argv[++i]);
             }
-        } else if (arg == "--help" || arg == "-h") {
-            std::cout << "Usage: exchange_node [options]\n"
-                      << "  --socket PATH     Unix domain socket path (default: "
-                      << Config{}.socket_path << ")\n"
-                      << "  --clock-hz HZ     RTL clock frequency in Hz (default: 250000000)\n"
-                      << "  --threshold VAL   Spread threshold in scaled units (default: "
-                      << Config{}.threshold_scaled << ")\n"
-                      << "  --symbols SYM...  Symbols to track (default: BTCUSDT ETHUSDT SOLUSDT)\n";
-            return 0;
         }
     }
 
-#ifdef _WIN32
+    // Install signal handler for graceful shutdown
     signal(SIGINT, signal_handler);
-#else
-    struct sigaction sa;
-    sa.sa_handler = signal_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGINT, &sa, nullptr);
-#endif
 
-    TerminalPlot plot;
-    plot.set_clock_hz(clock_hz);
-    plot.set_threshold(threshold_scaled);
-    plot.set_symbols(symbols);
-    TerminalPlot::init_screen();
+    // Initialize RTL (Verilated spread detector)
+    auto rtl = std::make_unique<Vspread_detector>();
 
-    double clock_period_ns = 1e9 / clock_hz;
-
-    std::unique_ptr<Vspread_detector> rtl = std::make_unique<Vspread_detector>();
-
-    rtl->clk = 0;
+    // Reset RTL
     rtl->rst_n = 0;
-    rtl->s_axis_tvalid = 0;
-    rtl->s_axis_tdata = 0;
-    rtl->eval();
-
-    rtl->clk = 1;
-    rtl->eval();
     rtl->clk = 0;
-    rtl->eval();
-    rtl->rst_n = 1;
+    rtl->s_axis_tdata = 0;
+    rtl->s_axis_tvalid = 0;
     rtl->eval();
 
-    std::cout << "[MAIN] RTL reset complete. Clock = "
-              << (clock_hz / 1e6) << " MHz (period "
-              << clock_period_ns << " ns)\n";
-    std::cout << "[MAIN] Threshold = " << threshold_scaled
-              << " scaled units (" << (threshold_scaled / 1e8) << " USD)\n";
-    std::cout << "[MAIN] Connecting to UDS: " << socket_path << "\n";
-    std::cout << "[MAIN] Press Ctrl+C to stop.\n\n";
+    rtl->clk = 1; rtl->eval();
+    rtl->clk = 0; rtl->eval();
+    rtl->rst_n = 1; rtl->eval();
 
+    // Initialize terminal plot
+    TerminalPlot plot(80, 50);
+    plot.set_threshold(threshold_scaled);
+    plot.set_clock_hz(clock_hz);
+    plot.set_symbols(symbols);
+    plot.init_screen();
+    plot.hide_cursor();
+
+    // Per-symbol rolling windows for z-score computation (pipeline level)
+    std::vector<RollingWindow> windows;
+    windows.reserve(symbols.size());
+    for (size_t i = 0; i < symbols.size(); ++i) {
+        windows.emplace_back(50); // 50-sample rolling window
+    }
+
+    // Initialize UDS socket reader (constructor auto-connects)
     UdsSocketReader reader(socket_path);
     if (!reader.connected()) {
-        std::cerr << "[MAIN] Failed to connect to UDS socket. "
-                  << "Make sure the Python ABIDES simulator is running.\n";
-        TerminalPlot::shutdown_screen();
+        std::cerr << "[FATAL] Failed to connect to exchange: " << socket_path << "\n";
         return 1;
     }
 
-    std::vector<SymbolData> symbol_data;
-    uint64_t update_count = 0;
+    std::cout << "[MAIN] RTL reset complete. Clock = " << (clock_hz / 1e6) << " MHz\n";
+    std::cout << "[MAIN] Threshold = " << threshold_scaled << " scaled units\n";
+    std::cout << "[MAIN] Connected to UDS: " << socket_path << "\n";
+    std::cout << "[MAIN] Press Ctrl+C to stop.\n\n";
+
+    // Main ingestion loop — pipeline only: read → parse → RTL → plot
+    // No arbitrage strategy here. Strategy lives on the user side (FPGA side),
+    // connected to Verilator RTL separately.
+    int update_count = 0;
     auto last_render = std::chrono::steady_clock::now();
-    const auto render_interval = std::chrono::milliseconds(100);
+    const auto render_interval = std::chrono::milliseconds(200);
 
     while (g_running.load()) {
         std::string payload;
         std::error_code ec;
         int n = reader.read_packet(payload, ec);
-
         if (n < 0) {
-            if (ec == std::errc::timed_out ||
-#ifdef _WIN32
-                ec == std::error_code(WSAETIMEDOUT, std::system_category())
-#else
-                ec == std::errc::timed_out
-#endif
-            ) {
-                continue;
-            }
-            std::cerr << "[MAIN] UDS read error: " << ec.message() << "\n";
-            break;
-        }
-
-        if (!parse_packet(payload, symbol_data)) {
-            std::cerr << "[MAIN] Failed to parse packet (" << n << " bytes)\n";
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
 
-        for (const auto& sd : symbol_data) {
-            uint64_t cycles = 0;
+        SymbolData sd = parse_packet(payload, symbols);
+        if (sd.sym_idx < 0) continue;
 
-            rtl->clk = 0;
-            rtl->s_axis_tdata = static_cast<int32_t>(sd.spread);
-            rtl->s_axis_tvalid = 1;
-            rtl->eval();
-            ++cycles;
+        // Compute z-score from spread (pipeline level)
+        double spread_scaled = static_cast<double>(sd.spread) / 1e8;
+        double z = windows[sd.sym_idx].zscore(spread_scaled);
+        windows[sd.sym_idx].push_back(spread_scaled);
 
-            rtl->clk = 1;
-            rtl->eval();
-            ++cycles;
+        // Feed z-score * 1e8 to RTL (fixed-point for hardware)
+        rtl->s_axis_tdata = static_cast<int32_t>(z * 1e8);
+        rtl->s_axis_tvalid = 1;
+        rtl->eval();
+        rtl->clk = 1;
+        rtl->eval();
+        rtl->s_axis_tvalid = 0;
+        rtl->clk = 0;
+        rtl->eval();
 
-            rtl->s_axis_tvalid = 0;
-            rtl->clk = 0;
-            rtl->eval();
+        // Read threshold breach from RTL (FPGA side)
+        bool breached = (rtl->threshold_breached_o != 0);
 
-            bool breached = (rtl->threshold_breached_o != 0);
-            double latency_ns = cycles * clock_period_ns;
-
-            plot.feed(sd.symbol, static_cast<double>(sd.spread), breached,
-                      cycles, latency_ns);
-
-            (void)breached;
-        }
+        // Feed to terminal plot (ingestion + RTL + display only)
+        plot.feed(sd.symbol, spread_scaled, breached, 0, 0);
 
         update_count++;
 
@@ -226,17 +237,14 @@ int main(int argc, char** argv) {
             last_render = now;
         }
 
-        if (n == 0) {
 #ifdef _WIN32
-            Sleep(1);
+        Sleep(1);
 #else
-            usleep(100);
+        usleep(100);
 #endif
-        }
     }
 
-    std::cout << "\n[MAIN] Shutting down... processed " << update_count
-              << " updates.\n";
+    std::cout << "\n[MAIN] Shutting down... processed " << update_count << " updates.\n";
     TerminalPlot::shutdown_screen();
     reader.close();
 

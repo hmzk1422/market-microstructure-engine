@@ -55,46 +55,85 @@ Explanation for System Architecture
 - **Dynamic Quote Stuffing & Spoofing Vectors**: Employs algorithmic agents that flood the limit order book with transient liquidity, phantom cancels, and high-frequency quote updates to stress-test the user's hardware spread detection and risk guardrails under adverse market conditions.
 - **Adverse Selection & Queue Position Stress-Testing**: Probes the limits of the User Side's queue priority and fill probability models by simulating aggressive front-running and informed order cancellation cascades during high-volatility regimes.
 
-# Core Commands/References
-Run using WSL/Linux.
-## C++ Pipeline & Hardware Build
-```bash
-# Clear old build artifacts and configure for Linux
-rm -rf build
-cmake -B build -DCMAKE_BUILD_TYPE=Release
+# End-to-End Arbitrage Pipeline (Windows)
 
-# Build both the ingestion engine and Verilator hardware testbench
-cmake --build build --parallel
+The arbitrage strategy lives in `hardware/sim/sim_main.cpp` (user side, connected to Verilator RTL). It:
+1. Connects to the ABIDES LOB simulator via TCP socket (127.0.0.1:6789)
+2. Computes a rolling z-score on the spread
+3. Feeds `z * 1e8` to Verilator RTL (`Vspread_detector`)
+4. Reads `threshold_breached_o` from RTL
+5. Opens long/short positions on threshold breach (mean reversion entry)
+6. Closes positions when z reverts toward 0 (mean reversion exit)
+7. Tracks and reports PnL per symbol
 
-# Run the standalone hardware simulation testbench
-./build/hardware/sim/sim_spread_detector
+### Prerequisites
+- Windows with Visual Studio 2022 (MSVC) and CMake
+- Python 3.x with ABIDES simulator
 
-# Run the live ingestion pipeline
-./build/bybit_ingestion -c config.json
+### Step 1: Build the C++ Strategy Binary
+
+```powershell
+# From the project root
+cd hardware
+mkdir build
+cmake -S . -B build
+cmake --build build --parallel --config Debug
 ```
-## Quantitative Simulator & Research (Python/ABIDES)
-```bash
-# Navigate to the simulator workspace
-cd simulator/DeepMarket/ABIDES
 
-# Run a clean independent crypto limit order simulation test
-python config/crypto_limit_order_sim.py --qty 0.5
+Output: `Debug/sim_spread_detector.exe`
 
-# Run with a larger event slice
-python config/crypto_limit_order_sim.py --event-limit 1000000
+### Step 2: Start the ABIDES LOB Simulator
+
+```powershell
+# From the project root
+cd exchange/abides
+python exchange_simulator.py --tcp --port 6789
 ```
-## Docker Deployment
-```bash
-# Start via Docker Compose
-cp .env.example .env
-docker compose up -d --build --force-recreate ingestion
 
-# View live execution logs
-docker compose logs -f ingestion
+The simulator publishes binary LOB packets (magic header + per-symbol spread/best-bid/best-ask, all scaled by 1e8).
 
-# Stop containers
-docker compose down
+### Step 3: Run the Arbitrage Strategy
+
+```powershell
+# From the project root
+.\Debug\sim_spread_detector.exe 127.0.0.1 6789
 ```
+
+Expected output:
+```
+[STRATEGY] Connected to exchange at 127.0.0.1:6789
+[STRATEGY] Z-score threshold: 2 sigma
+[STRATEGY] Position size: 1
+[STRATEGY] Press Ctrl+C to stop.
+
+[ARB] BTCUSDT LONG  @ z=-2.30 spread=33.58
+[ARB] BTCUSDT CLOSE @ z=0.41 PnL=3.78 Total=3.78
+[ARB] ETHUSDT SHORT @ z=2.17 spread=37.29
+[ARB] ETHUSDT CLOSE @ z=0.34 PnL=3.60 Total=8.20
+
+[STRATEGY] Shutting down... processed 15420 updates.
+[STRATEGY] BTCUSDT Total PnL: 5.71
+[STRATEGY] ETHUSDT Total PnL: 8.20
+```
+
+Press Ctrl+C to stop and print the final PnL summary.
+
+### Architecture Details
+
+| Component | File | Responsibility |
+|-----------|------|---------------|
+| RTL Spread Detector | `hardware/rtl/spread_detector.sv` | Compares scaled z-score against threshold, asserts `threshold_breached_o` |
+| Verilator Mock | `exchange/verilator_hooked.h` | C++ mock of `Vspread_detector` (Verilator not installed on Windows) |
+| Socket Reader | `exchange/socket_reader.{h,cpp}` | TCP client for ABIDES simulator (Windows loopback) |
+| Arbitrage Strategy | `hardware/sim/sim_main.cpp` | Z-score mean reversion: open on |z|>=2, close on z→0, PnL tracking |
+| Terminal Plot | `exchange/terminal_plot.{h,cpp}` | Real-time ANSI sparkline + signal display |
+
+### Configuration (`exchange/config.h`)
+
+- `zscore_threshold = 2.0` — entry threshold (sigma)
+- `threshold_scaled = 5000` — RTL fixed-point threshold
+- `position_size = 1.0` — base currency per trade
+- `price_scale = 1e8` — price/spread scaling factor
 # Summary and Results
 > NOTE: This system is instrumented for functional verification and architectural demonstration via Verilator in a virtualized WSL environment. Absolute latency metrics reflect software simulation and OS virtualization overhead, not bare-metal hardware performance.
 # Citations
