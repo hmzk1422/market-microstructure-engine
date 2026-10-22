@@ -1,0 +1,10 @@
+read_verilog -sv hardware/rtl/spread_detector.sv
+hierarchy -check -top spread_detector
+proc
+opt
+check
+stat
+synth -top spread_detector
+opt
+check
+stat

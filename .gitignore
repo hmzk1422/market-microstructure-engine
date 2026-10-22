@@ -8,6 +8,21 @@ cmake-build-*/
 *.exe
 *.out
 *.app
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/ALL_BUILD.vcxproj
+/ALL_BUILD.vcxproj.filters
+/ZERO_CHECK.proj
+/ZERO_CHECK.proj.filters
+/*.sln
+/*.vcxproj
+/*.vcxproj.filters
+/Debug/
+/Release/
+/x64/
+/sim_spread_detector.dir/
+/exchange/build_exchange/
 
 # ============================================================
 # IDE and editor files

@@ -166,13 +166,23 @@ int main(int argc, char** argv) {
     rtl->clk = 0; rtl->eval();
     rtl->rst_n = 1; rtl->eval();
 
-    UdsSocketReader reader("", port);
+    UdsSocketReader reader(Config{}.socket_path, port);
     if (!reader.connected()) {
+#ifdef _WIN32
         std::cerr << "[FATAL] Failed to connect to " << host << ":" << port << "\n";
+#else
+        std::cerr << "[FATAL] Failed to connect to Unix socket: "
+                  << Config{}.socket_path << "\n";
+#endif
         return 1;
     }
 
+#ifdef _WIN32
     std::cout << "[STRATEGY] Connected to exchange at " << host << ":" << port << "\n";
+#else
+    std::cout << "[STRATEGY] Connected to exchange socket "
+              << Config{}.socket_path << "\n";
+#endif
     std::cout << "[STRATEGY] Z-score threshold: " << Config{}.zscore_threshold << " sigma\n";
     std::cout << "[STRATEGY] Position size: " << Config{}.position_size << "\n";
     std::cout << "[STRATEGY] Press Ctrl+C to stop.\n\n";
