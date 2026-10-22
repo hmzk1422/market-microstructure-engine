@@ -75,59 +75,62 @@ UdsSocketReader::UdsSocketReader(const std::string& path, int port)
 }
 
 int UdsSocketReader::read_packet(std::string& out, std::error_code& ec) {
-    char header[20] = {0};
+    constexpr std::size_t header_size = 20;
+    constexpr std::uint32_t max_payload_size = 1024 * 1024;
+    char chunk[8192];
+    ec.clear();
+
+    const auto receive_more = [&]() -> bool {
 #ifdef _WIN32
-    int n = static_cast<int>(recv(_sock, header, sizeof(header), 0));
+        const int received = recv(_sock, chunk, sizeof(chunk), 0);
 #else
-    ssize_t n = read(_sock, header, sizeof(header));
+        const ssize_t received = read(_sock, chunk, sizeof(chunk));
 #endif
-    if (n <= 0) {
-#ifdef _WIN32
-        ec = std::error_code(WSAGetLastError(), std::system_category());
-#else
-        ec = std::error_code(errno, std::generic_category());
-#endif
-        return -1;
-    }
-
-    const uint32_t magic = *reinterpret_cast<const uint32_t*>(header);
-    const uint32_t payload_len = *reinterpret_cast<const uint32_t*>(header + 4);
-    const uint32_t msg_type = *reinterpret_cast<const uint32_t*>(header + 8);
-    const uint64_t timestamp_ns = *reinterpret_cast<const uint64_t*>(header + 12);
-    (void)msg_type;
-    (void)timestamp_ns;
-
-    if (magic != 0x4D4B5254) {  // "MKRT"
-        ec = std::error_code(EPROTO, std::generic_category());
-        return -1;
-    }
-
-    if (payload_len > 1024 * 1024) {
-        ec = std::error_code(E2BIG, std::generic_category());
-        return -1;
-    }
-
-    out.resize(payload_len);
-    int total = 0;
-    while (total < static_cast<int>(payload_len)) {
-#ifdef _WIN32
-        int r = static_cast<int>(recv(_sock, out.data() + total,
-                                       payload_len - total, 0));
-#else
-        ssize_t r = read(_sock, out.data() + total, payload_len - total);
-#endif
-        if (r <= 0) {
+        if (received <= 0) {
 #ifdef _WIN32
             ec = std::error_code(WSAGetLastError(), std::system_category());
 #else
             ec = std::error_code(errno, std::generic_category());
 #endif
+            return false;
+        }
+        _rx_buffer.append(chunk, static_cast<std::size_t>(received));
+        return true;
+    };
+
+    while (_rx_buffer.size() < header_size) {
+        if (!receive_more()) {
             return -1;
         }
-        total += r;
     }
 
-    return total;
+    std::uint32_t magic = 0;
+    std::uint32_t payload_len = 0;
+    std::memcpy(&magic, _rx_buffer.data(), sizeof(magic));
+    std::memcpy(&payload_len, _rx_buffer.data() + 4, sizeof(payload_len));
+
+    if (magic != 0x4D4B5254) {  // "MKRT"
+        ec = std::error_code(EPROTO, std::generic_category());
+        _rx_buffer.clear();
+        return -1;
+    }
+
+    if (payload_len > max_payload_size) {
+        ec = std::error_code(E2BIG, std::generic_category());
+        _rx_buffer.clear();
+        return -1;
+    }
+
+    const std::size_t packet_size = header_size + payload_len;
+    while (_rx_buffer.size() < packet_size) {
+        if (!receive_more()) {
+            return -1;
+        }
+    }
+
+    out.assign(_rx_buffer.data() + header_size, payload_len);
+    _rx_buffer.erase(0, packet_size);
+    return static_cast<int>(payload_len);
 }
 
 void UdsSocketReader::close() {

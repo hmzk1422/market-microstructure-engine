@@ -43,6 +43,8 @@ Explanation for System Architecture:
 - **Low-Latency Signal Interconnect (Verilated / Memory-Mapped I/O)**: Bridges the hardware detection trigger to the C++ orchestration layer via zero-copy shared memory rings and polled status registers (mmap), shaving microseconds off the standard Linux IPC overhead.
 - **Asymmetric Risk & Execution Guardrails (Hot/Cold Split)**: The hot path executes bare-metal order construction upon signal assertion while offloading non-critical logging, telemetry, and TimescaleDB persistence to asynchronous background threads to guarantee zero blocking latency on the trading loop.
 
+> Scope note: These architecture bullets are conceptual, not implemented or measured properties of this repository. The runnable path below uses software sockets and Verilator simulation; it is not a physical FPGA, kernel-bypass, or fiber deployment.
+
 ## Clearing House (Intermediary)
 Explanation for System Architecture
 - **Aggregation of Hybird Orderbook Data**: Queries from websocket directly, combines the aggregated liquidity in real markets as well as ABIDES-simulated data. Connects to Adversarial and User side by fiber cables.
@@ -55,85 +57,98 @@ Explanation for System Architecture
 - **Dynamic Quote Stuffing & Spoofing Vectors**: Employs algorithmic agents that flood the limit order book with transient liquidity, phantom cancels, and high-frequency quote updates to stress-test the user's hardware spread detection and risk guardrails under adverse market conditions.
 - **Adverse Selection & Queue Position Stress-Testing**: Probes the limits of the User Side's queue priority and fill probability models by simulating aggressive front-running and informed order cancellation cascades during high-volatility regimes.
 
-# End-to-End Arbitrage Pipeline (Windows)
+# Run in WSL (ABIDES or exchange WebSockets)
 
-The arbitrage strategy lives in `hardware/sim/sim_main.cpp` (user side, connected to Verilator RTL). It:
-1. Connects to the ABIDES LOB simulator via TCP socket (127.0.0.1:6789)
-2. Computes a rolling z-score on the spread
-3. Feeds `z * 1e8` to Verilator RTL (`Vspread_detector`)
-4. Reads `threshold_breached_o` from RTL
-5. Opens long/short positions on threshold breach (mean reversion entry)
-6. Closes positions when z reverts toward 0 (mean reversion exit)
-7. Tracks and reports PnL per symbol
+The source-selectable application is `hardware/build/market_data_engine`. It uses
+the actual SystemVerilog spread detector through Verilator; the default source
+is `abides`.
 
-### Prerequisites
-- Windows with Visual Studio 2022 (MSVC) and CMake
-- Python 3.x with ABIDES simulator
+## Build
 
-### Step 1: Build the C++ Strategy Binary
+Run these commands from WSL in the repository root. WSL needs CMake, a C++20
+compiler, Verilator, Boost.Beast headers, nlohmann-json, and OpenSSL development
+headers/libraries.
 
-```powershell
-# From the project root
-cd hardware
-mkdir build
-cmake -S . -B build
-cmake --build build --parallel --config Debug
+```bash
+cd /mnt/c/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine
+cmake -S hardware -B hardware/build -DCMAKE_BUILD_TYPE=Release
+cmake --build hardware/build --target market_data_engine -j2
 ```
 
-Output: `Debug/sim_spread_detector.exe`
+## ABIDES source (default)
 
-### Step 2: Start the ABIDES LOB Simulator
+Use two WSL terminals, both in the repository root. Start the simulator first:
 
-```powershell
-# From the project root
-cd exchange/abides
-python exchange_simulator.py --tcp --port 6789
+```bash
+python3 -u exchange/abides/exchange_simulator.py \
+  --socket /tmp/market_simulator.sock --symbols BTCUSDT ETHUSDT
 ```
 
-The simulator publishes binary LOB packets (magic header + per-symbol spread/best-bid/best-ask, all scaled by 1e8).
+Then run the application in the second terminal:
 
-### Step 3: Run the Arbitrage Strategy
-
-```powershell
-# From the project root
-.\Debug\sim_spread_detector.exe 127.0.0.1 6789
+```bash
+./hardware/build/market_data_engine \
+  --source abides --socket /tmp/market_simulator.sock \
+  --symbols BTCUSDT,ETHUSDT
 ```
 
-Expected output:
-```
-[STRATEGY] Connected to exchange at 127.0.0.1:6789
-[STRATEGY] Z-score threshold: 2 sigma
-[STRATEGY] Position size: 1
-[STRATEGY] Press Ctrl+C to stop.
+## Public Bybit and Binance WebSockets
 
-[ARB] BTCUSDT LONG  @ z=-2.30 spread=33.58
-[ARB] BTCUSDT CLOSE @ z=0.41 PnL=3.78 Total=3.78
-[ARB] ETHUSDT SHORT @ z=2.17 spread=37.29
-[ARB] ETHUSDT CLOSE @ z=0.34 PnL=3.60 Total=8.20
+No simulator process is needed. Run from the repository root:
 
-[STRATEGY] Shutting down... processed 15420 updates.
-[STRATEGY] BTCUSDT Total PnL: 5.71
-[STRATEGY] ETHUSDT Total PnL: 8.20
+```bash
+./hardware/build/market_data_engine \
+  --source websocket --symbols BTCUSDT,ETHUSDT
 ```
 
-Press Ctrl+C to stop and print the final PnL summary.
+The application subscribes to Bybit linear ticker and Binance book-ticker
+streams for each configured symbol. Use `Ctrl+C` to stop. The default output
+shows received RTL inputs and decisions (the first ten updates, then status and
+any RTL candidates); `--verbose` prints every processed update.
 
-### Architecture Details
+Both venues must have a fresh, complete quote before a symbol is sent to RTL.
+The RTL compares both executable buy/sell directions after the configured fees.
+Options `--bybit-fee-bps`, `--binance-fee-bps`, `--min-profit`, and
+`--max-quote-age-ms` override the defaults. ABIDES supplies one simulated book,
+which is mirrored to the two RTL venue inputs for exercising the pipeline; it
+does not represent two independent venues or demonstrate arbitrage.
 
-| Component | File | Responsibility |
-|-----------|------|---------------|
-| RTL Spread Detector | `hardware/rtl/spread_detector.sv` | Compares scaled z-score against threshold, asserts `threshold_breached_o` |
-| Verilator Mock | `exchange/verilator_hooked.h` | C++ mock of `Vspread_detector` (Verilator not installed on Windows) |
-| Socket Reader | `exchange/socket_reader.{h,cpp}` | TCP client for ABIDES simulator (Windows loopback) |
-| Arbitrage Strategy | `hardware/sim/sim_main.cpp` | Z-score mean reversion: open on |z|>=2, close on z→0, PnL tracking |
-| Terminal Plot | `exchange/terminal_plot.{h,cpp}` | Real-time ANSI sparkline + signal display |
+Data flow is source → C++ adapter → Verilated RTL → C++ z-score decision worker.
+The WebSocket adapter and decision worker use bounded, mutex-protected queues;
+each drops its oldest queued item on overflow. This executable does not
+currently persist updates to TimescaleDB. The simulated “fiber” is a logical
+data-path abstraction, not a physical network interface or FPGA deployment.
 
-### Configuration (`exchange/config.h`)
+## RTL interface and verification
 
-- `zscore_threshold = 2.0` — entry threshold (sigma)
-- `threshold_scaled = 5000` — RTL fixed-point threshold
-- `position_size = 1.0` — base currency per trade
-- `price_scale = 1e8` — price/spread scaling factor
+The detector samples inputs on the rising edge of `clk`; `rst_n` is an
+asynchronous active-low reset. `input_ready` is always asserted. A valid input
+requires both `input_valid` and `quotes_valid`, nonzero prices, and fees no
+greater than 10,000 bps. Prices are unsigned 32-bit values scaled by 10,000;
+fees are unsigned 16-bit basis points; `min_profit_i` is unsigned 49-bit in
+price-times-10,000 units. The registered outputs have one rising-edge
+input-to-output latency: `candidate_valid_o`, 2-bit direction, signed 49-bit
+net profit, 16-bit symbol ID, and 32-bit transaction ID. A candidate is emitted
+only when net profit is positive and strictly greater than `min_profit_i`.
+Invalid inputs clear the candidate output. Valid-range arithmetic is covered
+by boundary tests; invalid fees and zero prices are rejected.
+
+Run the independent C++ reference-model RTL tests and produce a VCD waveform:
+
+```bash
+ctest --test-dir hardware/build --output-on-failure
+```
+
+The waveform is `hardware/build/spread_detector.vcd` and includes clock, reset,
+input, valid, and candidate signals. The test covers reset, both directions,
+threshold equality, arithmetic limits, invalid inputs, consecutive
+transactions, and 512 synthetic symbol IDs.
+
+Vivado was not available in the verification environment. Yosys 0.52 synthesis
+completed successfully using `hardware/rtl/synth.ys`; all `check` passes
+reported zero problems. The final generic mapped netlist contains 14,613
+generic cells, including 100 flip-flops. This is not a Xilinx-specific resource
+estimate. The full output is saved in `hardware/rtl/synthesis_report.txt`.
 # Summary and Results
 > NOTE: This system is instrumented for functional verification and architectural demonstration via Verilator in a virtualized WSL environment. Absolute latency metrics reflect software simulation and OS virtualization overhead, not bare-metal hardware performance.
 # Citations

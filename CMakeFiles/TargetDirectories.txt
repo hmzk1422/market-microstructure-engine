@@ -1,3 +1,0 @@
-C:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/CMakeFiles/sim_spread_detector.dir
-C:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/CMakeFiles/ALL_BUILD.dir
-C:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/CMakeFiles/ZERO_CHECK.dir

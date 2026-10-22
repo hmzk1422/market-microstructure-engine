@@ -1,40 +1,97 @@
-module spread_detector #(
-    parameter DATA_WIDTH = 32,
-    parameter THRESHOLD  = 200000000  // Z-score threshold (2.0 in 1e8 units, i.e. +/- 2 SD)
-)(
-    input  logic                   clk,
-    input  logic                   rst_n, // Active-low reset
+module spread_detector (
+    input  logic              clk,
+    input  logic              rst_n,
 
-    // AXI-Stream Slave Interface (Receiving data from your C++ pipeline)
-    // s_axis_tdata: z-score (scaled by 1e8, e.g. 2.0 -> 200000000)
-    input  logic [DATA_WIDTH-1:0]  s_axis_tdata,
-    input  logic                   s_axis_tvalid,
-    output logic                   s_axis_tready,
+    input  logic              input_valid,
+    output logic              input_ready,
+    input  logic              quotes_valid,
+    input  logic [31:0]       bybit_bid_i,
+    input  logic [31:0]       bybit_ask_i,
+    input  logic [31:0]       binance_bid_i,
+    input  logic [31:0]       binance_ask_i,
+    input  logic [15:0]       bybit_fee_bps_i,
+    input  logic [15:0]       binance_fee_bps_i,
+    input  logic [48:0]       min_profit_i,
+    input  logic [15:0]       symbol_id_i,
+    input  logic [31:0]       transaction_id_i,
 
-    // Output Trigger (Signals your trading engine/strategy when z-score threshold is breached)
-    output logic                   threshold_breached_o,
-    output logic [DATA_WIDTH-1:0]  current_zscore_o
+    output logic              candidate_valid_o,
+    output logic [1:0]        direction_o,
+    output logic signed [48:0] net_profit_o,
+    output logic [15:0]       symbol_id_o,
+    output logic [31:0]       transaction_id_o
 );
+    localparam logic [15:0] FEE_SCALE = 16'd10000;
+    localparam logic [1:0] NO_DIRECTION = 2'd0;
+    localparam logic [1:0] BUY_BYBIT_SELL_BINANCE = 2'd1;
+    localparam logic [1:0] BUY_BINANCE_SELL_BYBIT = 2'd2;
 
-    // We are always ready to accept data from the pipeline in this basic design
-    assign s_axis_tready = 1'b1;
+    logic [47:0] bybit_bid_proceeds;
+    logic [47:0] bybit_ask_cost;
+    logic [47:0] binance_bid_proceeds;
+    logic [47:0] binance_ask_cost;
+    logic signed [48:0] buy_bybit_net;
+    logic signed [48:0] buy_binance_net;
+    logic signed [48:0] best_net;
+    logic [1:0] best_direction;
+    logic fees_valid;
 
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            threshold_breached_o <= 1'b0;
-            current_zscore_o     <= '0;
-        end else if (s_axis_tvalid && s_axis_tready) begin
-            // Store current incoming z-score
-            current_zscore_o     <= s_axis_tdata;
+    assign input_ready = 1'b1;
+    assign fees_valid = (bybit_fee_bps_i <= FEE_SCALE) &&
+                        (binance_fee_bps_i <= FEE_SCALE);
 
-            // Check against z-score threshold logic at hardware speed
-            // Breached when |z-score| >= THRESHOLD
-            if (s_axis_tdata >= THRESHOLD || s_axis_tdata <= -THRESHOLD) begin
-                threshold_breached_o <= 1'b1;
-            end else begin
-                threshold_breached_o <= 1'b0;
-            end
+    always_comb begin
+        bybit_bid_proceeds =
+            {16'b0, bybit_bid_i} * {32'b0, (FEE_SCALE - bybit_fee_bps_i)};
+        bybit_ask_cost =
+            {16'b0, bybit_ask_i} * {32'b0, (FEE_SCALE + bybit_fee_bps_i)};
+        binance_bid_proceeds =
+            {16'b0, binance_bid_i} * {32'b0, (FEE_SCALE - binance_fee_bps_i)};
+        binance_ask_cost =
+            {16'b0, binance_ask_i} * {32'b0, (FEE_SCALE + binance_fee_bps_i)};
+
+        buy_bybit_net =
+            $signed({1'b0, binance_bid_proceeds}) -
+            $signed({1'b0, bybit_ask_cost});
+        buy_binance_net =
+            $signed({1'b0, bybit_bid_proceeds}) -
+            $signed({1'b0, binance_ask_cost});
+
+        if (buy_bybit_net >= buy_binance_net) begin
+            best_net = buy_bybit_net;
+            best_direction = BUY_BYBIT_SELL_BINANCE;
+        end else begin
+            best_net = buy_binance_net;
+            best_direction = BUY_BINANCE_SELL_BYBIT;
         end
     end
 
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            candidate_valid_o <= 1'b0;
+            direction_o <= NO_DIRECTION;
+            net_profit_o <= '0;
+            symbol_id_o <= '0;
+            transaction_id_o <= '0;
+        end else begin
+            candidate_valid_o <= 1'b0;
+            direction_o <= NO_DIRECTION;
+            net_profit_o <= '0;
+            symbol_id_o <= '0;
+            transaction_id_o <= '0;
+
+            if (input_valid && input_ready && quotes_valid && fees_valid &&
+                bybit_bid_i != 0 && bybit_ask_i != 0 &&
+                binance_bid_i != 0 && binance_ask_i != 0) begin
+                net_profit_o <= best_net;
+                symbol_id_o <= symbol_id_i;
+                transaction_id_o <= transaction_id_i;
+                if (best_net > 0 &&
+                    {1'b0, best_net} > {1'b0, min_profit_i}) begin
+                    candidate_valid_o <= 1'b1;
+                    direction_o <= best_direction;
+                end
+            end
+        end
+    end
 endmodule

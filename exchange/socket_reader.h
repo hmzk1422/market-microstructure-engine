@@ -40,6 +40,7 @@ private:
     int _sock = -1;
 #endif
     std::string _path;
+    std::string _rx_buffer;
     int _port = 6789;
     bool _use_tcp = false;
 };
