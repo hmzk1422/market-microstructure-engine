@@ -73,3 +73,27 @@ venv/
 *.pyc
 *.pyo
 Research/
+
+# --- Xilinx Vivado / ISE Artifacts ---
+*.jou
+*.log
+*.str
+*.mif
+*.coe
+.hw/
+.cache/
+.runs/
+.gen/
+.ip_user_files/
+.hw_def/
+*.xpr
+*.ltx
+*.bit
+*.bin
+*.xsa
+
+# Vivado project subdirectories and temporary files
+*.sim/
+*.hw_server/
+*.ip_cache/
+*.srcs/utils_1/
