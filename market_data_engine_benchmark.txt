@@ -1,0 +1,37 @@
+Market Data Engine Runtime Benchmark
+=====================================
+Source: websocket
+Symbols: 2
+Runtime seconds: 21.305
+Accepted RTL updates: 1520
+RTL candidates: 1520
+Throughput updates_per_second: 71.346
+Stale quote rejections: 174
+WebSocket dropped updates: 0
+WebSocket malformed messages: 0
+Decision queue drops: 0
+
+Measured software latency (steady_clock, ns):
+WebSocket callback to Verilator output: observed=1520 retained=1520 mean_ns=451899 p50_ns=60719 p95_ns=170079 p99_ns=10550357 max_ns=84252201
+Verilator eval wall time: observed=1520 retained=1520 mean_ns=817 p50_ns=157 p95_ns=3849 p99_ns=5586 max_ns=18184
+WebSocket callback to strategy enqueue: observed=1520 retained=1520 mean_ns=641829 p50_ns=62605 p95_ns=209022 p99_ns=18589750 max_ns=105808764
+Strategy queue wait: observed=1520 retained=1520 mean_ns=91850 p50_ns=28844 p95_ns=79995 p99_ns=161705 max_ns=42746518
+
+Hardware and network evidence:
+RTL registered latency: 1 rising-edge cycle in the Verilated model; no physical clock period measured
+FPGA target / bitstream: Xilinx Artix-7 (xc7a35tcpg236-1, Speed Grade -1)
+Post-place-and-route Fmax: not measured
+WNS / WHS timing closure: not measured
+FPGA LUT / FF / carry / BRAM / URAM / DSP usage:
+- 465 used out of 20,800 available (2.24%)
+- 455 used out of 41,600 available (1.09%)
+- 78 CARRY4 primitives used for arithmetic/adders
+- 8 DSP48E1 slices used out of 90 available (8.89%)
+- 0 (0.00% utilization, logic is purely register/combinatorial/DSP-based)
+Fiber receive / transmit latency: not measured; callback timing starts after the WebSocket read completes
+Order dispatch latency: not measured; this executable emits paper decisions and sends no exchange orders
+mmap / FPGA DMA: not present; Verilator is linked into this process
+
+Ran benchmark, synthesis. Never ran implementation.
+- The RTL design functions as a high-speed streaming IP core. Top-level testbench simulation and verification are executed via Verilator, coupling the 1-cycle latency SystemVerilog filter directly to a high-performance C++ quantitative execution engine over a simulated host interface.
+- For real production-grade method, we need to wrap the inputs and outputs into a narrow streaming interface—like an AXI4-Stream bus (e.g., a single 32-bit data bus with a valid, ready, and last handshake). Instead of sending everything in parallel across 394 pins, you serialize the data over a few pins across multiple clock cycles.

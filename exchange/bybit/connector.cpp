@@ -1,4 +1,5 @@
 #include "../websocket_common.h"
+#include "../file_logger.h"
 #include "../websocket_feed.h"
 
 #include <nlohmann/json.hpp>
@@ -78,12 +79,18 @@ void run_bybit_connector(
             "stream.bybit.com", "443", "/v5/public/linear", subscriptions,
             "BYBIT",
             [&](const std::string& raw) {
+                const auto received_at = std::chrono::steady_clock::now();
                 try {
                     QuoteUpdate update{};
                     if (parse_quote(raw, update)) {
+                        update.received_at = received_at;
+                        exchange_log("BYBIT", "quote_parsed symbol=" + update.symbol + " bid_raw=" + std::to_string(update.bid) + " ask_raw=" + std::to_string(update.ask));
                         publish(std::move(update));
+                    } else {
+                        exchange_log("BYBIT", "message_ignored: " + raw.substr(0, 300));
                     }
                 } catch (const std::exception&) {
+                    exchange_log("BYBIT", "parse_exception: " + raw.substr(0, 300));
                     malformed();
                 }
             },
