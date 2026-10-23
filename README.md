@@ -2,6 +2,11 @@
 Author      : hmzk1422  
 Version     : v1.0.0
 
+> **Performance Summary & Verdict:** 
+> Our Verilated hardware filter core evaluates in a blazing **157 ns** median, but overall system end-to-end latency is bounded by OS threading at **62.6 µs median** with tail spikes up to **105.8 ms**. 
+> 
+> * **Performance & Telemetry:** Read the full breakdown in **[BENCHMARK.md](./BENCHMARK.md)**.
+> * **Hardware Roadmap:** Moving to physical Xilinx target (changes to the code) **[FPGA_PERFORMANCE_PLAN.md](./FPGA_PERFORMANCE_PLAN.md)**.
 ## Planned Architecture
 ```mermaid
 flowchart TD
