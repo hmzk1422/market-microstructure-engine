@@ -50,18 +50,18 @@ Ran benchmark and synthesis; implementation was intentionally bypassed.
 ### Pipeline Latency Model
 Let:
 - $T_{\text{e2e}}$ = WebSocket callback to strategy enqueue (Total system latency)
-- $T_{\text{ws\_rtl}}$ = WebSocket callback to Verilator output (Ingress parsing + hardware processing)
+- $T_{\text{ingress}}$ = WebSocket callback to Verilator output (Ingress parsing + hardware processing)
 - $T_{\text{eval}}$ = Verilator eval wall time (Pure hardware execution time)
 - $T_{\text{qwait}}$ = Strategy queue wait (Inter-thread queue waiting time)
 
-$$T_{\text{e2e}} = T_{\text{ws\_rtl}} + T_{\text{qwait}} + T_{\text{overhead}}$$
+$$T_{\text{e2e}} = T_{\text{ingress}} + T_{\text{qwait}} + T_{\text{overhead}}$$
 
 Mapping empirical data into the pipeline model yields:
 - **At Median ($p50$ - Steady State):**
-  $$62,605\text{ ns} \approx 60,719\text{ ns } (T_{\text{ws\_rtl}}) + 28,844\text{ ns } (T_{\text{qwait}}) + T_{\text{overhead}}$$
+  $$62,605\text{ ns} \approx 60,719\text{ ns } (T_{\text{ingress}}) + 28,844\text{ ns } (T_{\text{qwait}}) + T_{\text{overhead}}$$
   *(Note: The hardware execution layer $T_{\text{eval}}$ operates at a median of **157 ns**, confirming zero bottleneck in the RTL core).*
 - **At Tail / Worst-Case Spike ($Max$):**
-  $$105,808,764\text{ ns} \approx 84,252,201\text{ ns } (T_{\text{ws\_rtl}} \text{ spike}) + 42,746,518\text{ ns } (T_{\text{qwait}} \text{ spike})$$
+  $$105,808,764\text{ ns} \approx 84,252,201\text{ ns } (T_{\text{ingress}} \text{ spike}) + 42,746,518\text{ ns } (T_{\text{qwait}} \text{ spike})$$
 
 ### Final Verdict
 Our system operated at a median of **62.6 microseconds ($\mu s$)** with a worst-case tail spike of **105.8 milliseconds ($ms$)**. 
