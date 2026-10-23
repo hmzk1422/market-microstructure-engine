@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="spread_detector_behav.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="spread_detector" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="0 ps"></ZoomStartTime>
+      <ZoomEndTime time="10 ps"></ZoomEndTime>
+      <Cursor1Time time="0 ps"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="340"></NameColumnWidth>
+      <ValueColumnWidth column_width="155"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="54" />
+   <wvobject fp_name="/spread_detector/clk" type="logic">
+      <obj_property name="ElementShortName">clk</obj_property>
+      <obj_property name="ObjectShortName">clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/rst_n" type="logic">
+      <obj_property name="ElementShortName">rst_n</obj_property>
+      <obj_property name="ObjectShortName">rst_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/input_valid" type="logic">
+      <obj_property name="ElementShortName">input_valid</obj_property>
+      <obj_property name="ObjectShortName">input_valid</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/input_ready" type="logic">
+      <obj_property name="ElementShortName">input_ready</obj_property>
+      <obj_property name="ObjectShortName">input_ready</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/quotes_valid" type="logic">
+      <obj_property name="ElementShortName">quotes_valid</obj_property>
+      <obj_property name="ObjectShortName">quotes_valid</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/bybit_bid_i" type="array">
+      <obj_property name="ElementShortName">bybit_bid_i[31:0]</obj_property>
+      <obj_property name="ObjectShortName">bybit_bid_i[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/bybit_ask_i" type="array">
+      <obj_property name="ElementShortName">bybit_ask_i[31:0]</obj_property>
+      <obj_property name="ObjectShortName">bybit_ask_i[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/binance_bid_i" type="array">
+      <obj_property name="ElementShortName">binance_bid_i[31:0]</obj_property>
+      <obj_property name="ObjectShortName">binance_bid_i[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/binance_ask_i" type="array">
+      <obj_property name="ElementShortName">binance_ask_i[31:0]</obj_property>
+      <obj_property name="ObjectShortName">binance_ask_i[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/bybit_fee_bps_i" type="array">
+      <obj_property name="ElementShortName">bybit_fee_bps_i[15:0]</obj_property>
+      <obj_property name="ObjectShortName">bybit_fee_bps_i[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/binance_fee_bps_i" type="array">
+      <obj_property name="ElementShortName">binance_fee_bps_i[15:0]</obj_property>
+      <obj_property name="ObjectShortName">binance_fee_bps_i[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/min_profit_i" type="array">
+      <obj_property name="ElementShortName">min_profit_i[48:0]</obj_property>
+      <obj_property name="ObjectShortName">min_profit_i[48:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/symbol_id_i" type="array">
+      <obj_property name="ElementShortName">symbol_id_i[15:0]</obj_property>
+      <obj_property name="ObjectShortName">symbol_id_i[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/transaction_id_i" type="array">
+      <obj_property name="ElementShortName">transaction_id_i[31:0]</obj_property>
+      <obj_property name="ObjectShortName">transaction_id_i[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/candidate_valid_o" type="logic">
+      <obj_property name="ElementShortName">candidate_valid_o</obj_property>
+      <obj_property name="ObjectShortName">candidate_valid_o</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/direction_o" type="array">
+      <obj_property name="ElementShortName">direction_o[1:0]</obj_property>
+      <obj_property name="ObjectShortName">direction_o[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/net_profit_o" type="array">
+      <obj_property name="ElementShortName">net_profit_o[48:0]</obj_property>
+      <obj_property name="ObjectShortName">net_profit_o[48:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/symbol_id_o" type="array">
+      <obj_property name="ElementShortName">symbol_id_o[15:0]</obj_property>
+      <obj_property name="ObjectShortName">symbol_id_o[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/transaction_id_o" type="array">
+      <obj_property name="ElementShortName">transaction_id_o[31:0]</obj_property>
+      <obj_property name="ObjectShortName">transaction_id_o[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/latency_o" type="array">
+      <obj_property name="ElementShortName">latency_o[31:0]</obj_property>
+      <obj_property name="ObjectShortName">latency_o[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/cycle_counter" type="array">
+      <obj_property name="ElementShortName">cycle_counter[31:0]</obj_property>
+      <obj_property name="ObjectShortName">cycle_counter[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/accepted_cycle" type="array">
+      <obj_property name="ElementShortName">accepted_cycle[31:0]</obj_property>
+      <obj_property name="ObjectShortName">accepted_cycle[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/stage_valid" type="logic">
+      <obj_property name="ElementShortName">stage_valid</obj_property>
+      <obj_property name="ObjectShortName">stage_valid</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/quotes_valid_q" type="logic">
+      <obj_property name="ElementShortName">quotes_valid_q</obj_property>
+      <obj_property name="ObjectShortName">quotes_valid_q</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/bybit_bid_q" type="array">
+      <obj_property name="ElementShortName">bybit_bid_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">bybit_bid_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/bybit_ask_q" type="array">
+      <obj_property name="ElementShortName">bybit_ask_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">bybit_ask_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/binance_bid_q" type="array">
+      <obj_property name="ElementShortName">binance_bid_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">binance_bid_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/binance_ask_q" type="array">
+      <obj_property name="ElementShortName">binance_ask_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">binance_ask_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/bybit_fee_q" type="array">
+      <obj_property name="ElementShortName">bybit_fee_q[15:0]</obj_property>
+      <obj_property name="ObjectShortName">bybit_fee_q[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/binance_fee_q" type="array">
+      <obj_property name="ElementShortName">binance_fee_q[15:0]</obj_property>
+      <obj_property name="ObjectShortName">binance_fee_q[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/min_profit_q" type="array">
+      <obj_property name="ElementShortName">min_profit_q[48:0]</obj_property>
+      <obj_property name="ObjectShortName">min_profit_q[48:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/symbol_id_q" type="array">
+      <obj_property name="ElementShortName">symbol_id_q[15:0]</obj_property>
+      <obj_property name="ObjectShortName">symbol_id_q[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/transaction_id_q" type="array">
+      <obj_property name="ElementShortName">transaction_id_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">transaction_id_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/bybit_bid_proceeds" type="array">
+      <obj_property name="ElementShortName">bybit_bid_proceeds[47:0]</obj_property>
+      <obj_property name="ObjectShortName">bybit_bid_proceeds[47:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/bybit_ask_cost" type="array">
+      <obj_property name="ElementShortName">bybit_ask_cost[47:0]</obj_property>
+      <obj_property name="ObjectShortName">bybit_ask_cost[47:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/binance_bid_proceeds" type="array">
+      <obj_property name="ElementShortName">binance_bid_proceeds[47:0]</obj_property>
+      <obj_property name="ObjectShortName">binance_bid_proceeds[47:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/binance_ask_cost" type="array">
+      <obj_property name="ElementShortName">binance_ask_cost[47:0]</obj_property>
+      <obj_property name="ObjectShortName">binance_ask_cost[47:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/buy_bybit_net" type="array">
+      <obj_property name="ElementShortName">buy_bybit_net[48:0]</obj_property>
+      <obj_property name="ObjectShortName">buy_bybit_net[48:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/buy_binance_net" type="array">
+      <obj_property name="ElementShortName">buy_binance_net[48:0]</obj_property>
+      <obj_property name="ObjectShortName">buy_binance_net[48:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/best_net" type="array">
+      <obj_property name="ElementShortName">best_net[48:0]</obj_property>
+      <obj_property name="ObjectShortName">best_net[48:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/best_direction" type="array">
+      <obj_property name="ElementShortName">best_direction[1:0]</obj_property>
+      <obj_property name="ObjectShortName">best_direction[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/fees_valid" type="logic">
+      <obj_property name="ElementShortName">fees_valid</obj_property>
+      <obj_property name="ObjectShortName">fees_valid</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/FEE_SCALE" type="array">
+      <obj_property name="ElementShortName">FEE_SCALE[15:0]</obj_property>
+      <obj_property name="ObjectShortName">FEE_SCALE[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/NO_DIRECTION" type="array">
+      <obj_property name="ElementShortName">NO_DIRECTION[1:0]</obj_property>
+      <obj_property name="ObjectShortName">NO_DIRECTION[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/BUY_BYBIT_SELL_BINANCE" type="array">
+      <obj_property name="ElementShortName">BUY_BYBIT_SELL_BINANCE[1:0]</obj_property>
+      <obj_property name="ObjectShortName">BUY_BYBIT_SELL_BINANCE[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/BUY_BINANCE_SELL_BYBIT" type="array">
+      <obj_property name="ElementShortName">BUY_BINANCE_SELL_BYBIT[1:0]</obj_property>
+      <obj_property name="ObjectShortName">BUY_BINANCE_SELL_BYBIT[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/clk" type="logic">
+      <obj_property name="ElementShortName">clk</obj_property>
+      <obj_property name="ObjectShortName">clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/rst_n" type="logic">
+      <obj_property name="ElementShortName">rst_n</obj_property>
+      <obj_property name="ObjectShortName">rst_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/input_valid" type="logic">
+      <obj_property name="ElementShortName">input_valid</obj_property>
+      <obj_property name="ObjectShortName">input_valid</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/input_ready" type="logic">
+      <obj_property name="ElementShortName">input_ready</obj_property>
+      <obj_property name="ObjectShortName">input_ready</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/quotes_valid" type="logic">
+      <obj_property name="ElementShortName">quotes_valid</obj_property>
+      <obj_property name="ObjectShortName">quotes_valid</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/net_profit_o" type="array">
+      <obj_property name="ElementShortName">net_profit_o[48:0]</obj_property>
+      <obj_property name="ObjectShortName">net_profit_o[48:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/transaction_id_o" type="array">
+      <obj_property name="ElementShortName">transaction_id_o[31:0]</obj_property>
+      <obj_property name="ObjectShortName">transaction_id_o[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/spread_detector/latency_o" type="array">
+      <obj_property name="ElementShortName">latency_o[31:0]</obj_property>
+      <obj_property name="ObjectShortName">latency_o[31:0]</obj_property>
+   </wvobject>
+</wave_config>

@@ -2,7 +2,7 @@
 Author      : hmzk1422  
 Version     : v1.0.0
 
-## Architecture
+## Planned Architecture
 ```mermaid
 flowchart TD
     subgraph Python ["Python Research & DeepMarket Simulator"]
@@ -57,6 +57,13 @@ Explanation for System Architecture
 - **Dynamic Quote Stuffing & Spoofing Vectors**: Employs algorithmic agents that flood the limit order book with transient liquidity, phantom cancels, and high-frequency quote updates to stress-test the user's hardware spread detection and risk guardrails under adverse market conditions.
 - **Adverse Selection & Queue Position Stress-Testing**: Probes the limits of the User Side's queue priority and fill probability models by simulating aggressive front-running and informed order cancellation cascades during high-volatility regimes.
 
+## System Component,Status,Architectural Scope & Notes
+[X] **Our Trading Firm (Core Pipeline)**: Implemented. C++ execution engine coupled directly to the Verilated SystemVerilog co-processor. Fully instrumented for telemetry; extensible for advanced arbitrage logic.
+
+[ ] **Clearing House / Venue Ingress**: Simulated (Data Feeder Only). Consumes public exchange WebSockets (Bybit/Binance). Not currently acting as an exchange matching engine or institutional intermediary.
+
+[ ] **Adversarial / Latency Injection**: Not Implemented. Planned for future testing phases to simulate adverse selection, order book slippage, and front-running conditions.
+
 # Run in WSL (ABIDES or exchange WebSockets)
 
 The source-selectable application is `hardware/build/market_data_engine`. It uses
@@ -65,12 +72,12 @@ is `abides`.
 
 ## Build
 
+**Use WLS/Debian Ubuntu.**
 Run these commands from WSL in the repository root. WSL needs CMake, a C++20
 compiler, Verilator, Boost.Beast headers, nlohmann-json, and OpenSSL development
 headers/libraries.
 
 ```bash
-cd /mnt/c/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine
 cmake -S hardware -B hardware/build -DCMAKE_BUILD_TYPE=Release
 cmake --build hardware/build --target market_data_engine -j2
 ```
@@ -87,9 +94,7 @@ python3 -u exchange/abides/exchange_simulator.py \
 Then run the application in the second terminal:
 
 ```bash
-./hardware/build/market_data_engine \
-  --source abides --socket /tmp/market_simulator.sock \
-  --symbols BTCUSDT,ETHUSDT
+./hardware/build/market_data_engine --source websocket --symbols BTCUSDT,ETHUSDT
 ```
 
 ## Public Bybit and Binance WebSockets
@@ -102,18 +107,21 @@ No simulator process is needed. Run from the repository root:
 ```
 
 The application subscribes to Bybit linear ticker and Binance book-ticker
-streams for each configured symbol. Use `Ctrl+C` to stop. The default output
-shows received RTL inputs and decisions (the first ten updates, then status and
-any RTL candidates); `--verbose` prints every processed update.
+streams for each configured symbol. Use `Ctrl+C` to stop. It writes terminal
+output to `market_data_engine.txt` in the current directory. The log includes
+the first ten RTL inputs, periodic status, Verilator arbitrage alerts, and
+paper trade entries/exits; `--verbose` prints every processed RTL input.
 
 Both venues must have a fresh, complete quote before a symbol is sent to RTL.
 The RTL compares both executable buy/sell directions after the configured fees.
-Options `--bybit-fee-bps`, `--binance-fee-bps`, `--min-profit`, and
-`--max-quote-age-ms` override the defaults. ABIDES supplies one simulated book,
+The paper strategy assumes zero fees by default to show gross spread signals;
+set `--bybit-fee-bps` and `--binance-fee-bps` to your account's fees for net
+signals. Options `--min-profit` and `--max-quote-age-ms` override their defaults.
+The executable reports paper trades only and does not send orders. ABIDES supplies one simulated book,
 which is mirrored to the two RTL venue inputs for exercising the pipeline; it
 does not represent two independent venues or demonstrate arbitrage.
 
-Data flow is source → C++ adapter → Verilated RTL → C++ z-score decision worker.
+Data flow is source → C++ adapter → Verilated RTL → C++ paper trade manager.
 The WebSocket adapter and decision worker use bounded, mutex-protected queues;
 each drops its oldest queued item on overflow. This executable does not
 currently persist updates to TimescaleDB. The simulated “fiber” is a logical

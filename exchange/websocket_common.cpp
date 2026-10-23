@@ -1,4 +1,5 @@
 #include "websocket_common.h"
+#include "file_logger.h"
 
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -13,6 +14,7 @@
 #include <openssl/ssl.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <iostream>
 #include <thread>
@@ -69,16 +71,21 @@ void run_session(
     ws.next_layer().handshake(ssl::stream_base::client);
     beast::get_lowest_layer(ws).expires_never();
 
-    ws.set_option(websocket::stream_base::timeout::suggested(
-        beast::role_type::client));
+    auto websocket_timeout = websocket::stream_base::timeout::suggested(
+        beast::role_type::client);
+    websocket_timeout.idle_timeout = std::chrono::seconds(5);
+    websocket_timeout.keep_alive_pings = true;
+    ws.set_option(websocket_timeout);
     ws.handshake(host, target);
     std::cout << "[SOURCE] " << venue << " websocket connected\n";
+    exchange_log(venue, "connected host=" + host + " port=" + port + " target=" + target);
 
     for (const auto& subscription : subscriptions) {
         if (stopping()) {
             break;
         }
         ws.write(net::buffer(subscription));
+        exchange_log(venue, "subscription sent: " + subscription);
         if (pause_or_stop(stopping, std::chrono::milliseconds(250))) {
             break;
         }
@@ -89,14 +96,42 @@ void run_session(
         return;
     }
 
-    while (!stopping()) {
-        beast::flat_buffer buffer;
-        ws.read(buffer);
-        on_message(beast::buffers_to_string(buffer.data()));
+    std::atomic<bool> session_finished{false};
+    std::thread stop_watcher([&] {
+        while (!session_finished.load(std::memory_order_relaxed) &&
+               !stopping()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(25));
+        }
+        if (stopping() &&
+            !session_finished.load(std::memory_order_relaxed)) {
+            boost::system::error_code ignored;
+            beast::get_lowest_layer(ws).socket().close(ignored);
+        }
+    });
+    try {
+        while (!stopping()) {
+            beast::flat_buffer buffer;
+            ws.read(buffer);
+            const auto raw = beast::buffers_to_string(buffer.data());
+            static std::atomic<unsigned long long> received{0};
+            const auto count = ++received;
+            if (count <= 5 || count % 1000 == 0) {
+                exchange_log(venue, "message_received count=" + std::to_string(count) + " bytes=" + std::to_string(raw.size()) + " sample=" + raw.substr(0, 300));
+            }
+            on_message(raw);
+        }
+    } catch (...) {
+        session_finished.store(true, std::memory_order_relaxed);
+        stop_watcher.join();
+        throw;
     }
+    session_finished.store(true, std::memory_order_relaxed);
+    stop_watcher.join();
 
-    boost::system::error_code ignored;
-    ws.close(websocket::close_code::normal, ignored);
+    if (!stopping()) {
+        boost::system::error_code ignored;
+        ws.close(websocket::close_code::normal, ignored);
+    }
 }
 
 } // namespace
@@ -118,6 +153,7 @@ void run_reconnecting_websocket(
             retry_delay = std::chrono::milliseconds(500);
         } catch (const std::exception& error) {
             if (!stopping()) {
+                exchange_log(venue, std::string("connection_error: ") + error.what() + "; retry_ms=" + std::to_string(retry_delay.count()));
                 std::cerr << "[SOURCE] " << venue << " websocket: "
                           << error.what() << "; reconnecting in "
                           << retry_delay.count() << "ms\n";

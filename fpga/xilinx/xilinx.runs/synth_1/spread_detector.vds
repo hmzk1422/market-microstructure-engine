@@ -1,0 +1,314 @@
+INFO: [Common 17-3922] A valid Vivado Design Suite BASIC license has been detected. Your current license is active and will expire on 19-oct-2027.
+#-----------------------------------------------------------
+# Vivado v2026.1 (64-bit)
+# SW Build 6511674 on Tue Jun 16 11:02:23 MDT 2026
+# IP Build 6504888 on Tue Jun 09 09:05:25 MDT 2026
+# SharedData Build 6501428 on Mon Jun 08 17:34:18 MDT 2026
+# Start of session at: Sat Oct 24 03:02:10 2026
+# Process ID         : 36056
+# Current directory  : C:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/fpga/xilinx/xilinx.runs/synth_1
+# Command line       : vivado.exe -log spread_detector.vds -product Vivado -mode batch -messageDb vivado.pb -notrace -source spread_detector.tcl
+# Log file           : C:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/fpga/xilinx/xilinx.runs/synth_1/spread_detector.vds
+# Journal file       : C:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/fpga/xilinx/xilinx.runs/synth_1\vivado.jou
+# Running On         : LAPTOP-4G4JFDCE
+# Platform           : Windows 11
+# Operating System   : 26300
+# Processor Detail   : 11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz
+# CPU Frequency      : 2304 MHz
+# CPU Physical cores : 8
+# CPU Logical cores  : 16
+# Host memory        : 16799 MB
+# Swap memory        : 47039 MB
+# Total Virtual      : 63839 MB
+# Available Virtual  : 6550 MB
+#-----------------------------------------------------------
+source spread_detector.tcl -notrace
+create_project: Time (s): cpu = 00:00:10 ; elapsed = 00:00:11 . Memory (MB): peak = 592.914 ; gain = 267.668
+Command: synth_design -top spread_detector -part xc7a35tcpg236-1
+Starting synth_design
+Attempting to get a license for feature 'Vivado_Synthesis' and/or device 'xc7a35t'
+INFO: [Common 17-349] Got license for feature 'Vivado_Synthesis' and/or device 'xc7a35t'
+INFO: [Device 21-403] Loading part xc7a35tcpg236-1
+INFO: [Designutils 20-5008] Incremental synthesis strategy default
+INFO: [Synth 8-7079] Multithreading enabled for synth_design using a maximum of 2 processes.
+INFO: [Synth 8-7078] Launching helper process for spawning children vivado processes
+INFO: [Synth 8-7075] Helper process launched with PID 33748
+---------------------------------------------------------------------------------
+Starting RTL Elaboration : Time (s): cpu = 00:00:09 ; elapsed = 00:00:10 . Memory (MB): peak = 1353.922 ; gain = 578.375
+---------------------------------------------------------------------------------
+INFO: [Synth 8-6157] synthesizing module 'spread_detector' [C:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/fpga/xilinx/xilinx.srcs/sources_1/imports/rtl/spread_detector.sv:2]
+INFO: [Synth 8-6155] done synthesizing module 'spread_detector' (0#1) [C:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/fpga/xilinx/xilinx.srcs/sources_1/imports/rtl/spread_detector.sv:2]
+WARNING: [Synth 8-3917] design spread_detector has port input_ready driven by constant 1
+---------------------------------------------------------------------------------
+Finished RTL Elaboration : Time (s): cpu = 00:00:12 ; elapsed = 00:00:13 . Memory (MB): peak = 1474.016 ; gain = 698.469
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Handling Custom Attributes
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Handling Custom Attributes : Time (s): cpu = 00:00:12 ; elapsed = 00:00:14 . Memory (MB): peak = 1474.016 ; gain = 698.469
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished RTL Optimization Phase 1 : Time (s): cpu = 00:00:12 ; elapsed = 00:00:14 . Memory (MB): peak = 1474.016 ; gain = 698.469
+---------------------------------------------------------------------------------
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.009 . Memory (MB): peak = 1474.016 ; gain = 0.000
+INFO: [Project 1-570] Preparing netlist for logic optimization
+
+Processing XDC Constraints
+Initializing timing engine
+Parsing XDC File [C:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/fpga/xilinx/xilinx.srcs/constrs_1/new/design.xdc]
+Finished Parsing XDC File [C:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/fpga/xilinx/xilinx.srcs/constrs_1/new/design.xdc]
+Completed Processing XDC Constraints
+
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.001 . Memory (MB): peak = 1544.254 ; gain = 0.000
+INFO: [Project 1-111] Unisim Transformation Summary:
+No Unisim elements were transformed.
+
+Constraint Validation Runtime : Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.040 . Memory (MB): peak = 1545.918 ; gain = 0.000
+---------------------------------------------------------------------------------
+Finished Constraint Validation : Time (s): cpu = 00:00:22 ; elapsed = 00:00:26 . Memory (MB): peak = 1545.918 ; gain = 770.371
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Loading Part and Timing Information
+---------------------------------------------------------------------------------
+Loading part: xc7a35tcpg236-1
+---------------------------------------------------------------------------------
+Finished Loading Part and Timing Information : Time (s): cpu = 00:00:22 ; elapsed = 00:00:26 . Memory (MB): peak = 1545.918 ; gain = 770.371
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Applying 'set_property' XDC Constraints
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished applying 'set_property' XDC Constraints : Time (s): cpu = 00:00:22 ; elapsed = 00:00:26 . Memory (MB): peak = 1545.918 ; gain = 770.371
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished RTL Optimization Phase 2 : Time (s): cpu = 00:00:23 ; elapsed = 00:00:27 . Memory (MB): peak = 1545.918 ; gain = 770.371
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start RTL Component Statistics 
+---------------------------------------------------------------------------------
+Detailed RTL Component Info : 
++---Adders : 
+	   3 Input   49 Bit       Adders := 2     
+	   3 Input   32 Bit       Adders := 1     
+	   2 Input   16 Bit       Adders := 4     
++---Registers : 
+	               49 Bit    Registers := 2     
+	               32 Bit    Registers := 8     
+	               16 Bit    Registers := 4     
+	                2 Bit    Registers := 1     
+	                1 Bit    Registers := 3     
++---Multipliers : 
+	              16x32  Multipliers := 4     
++---Muxes : 
+	   2 Input   49 Bit        Muxes := 3     
+	   2 Input   32 Bit        Muxes := 2     
+	   2 Input   16 Bit        Muxes := 2     
+	   5 Input    2 Bit        Muxes := 1     
+---------------------------------------------------------------------------------
+Finished RTL Component Statistics 
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Part Resource Summary
+---------------------------------------------------------------------------------
+Part Resources:
+DSPs: 90 (col length:60)
+BRAMs: 100 (col length: RAMB18 60 RAMB36 30)
+---------------------------------------------------------------------------------
+Finished Part Resource Summary
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Cross Boundary and Area Optimization
+---------------------------------------------------------------------------------
+DSP Report: Generating DSP best_net3, operation Mode is: A*B.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: Generating DSP best_net3, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: Generating DSP best_net3, operation Mode is: A*B.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: Generating DSP best_net3, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: Generating DSP best_net3, operation Mode is: A*B.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: Generating DSP best_net3, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: Generating DSP best_net3, operation Mode is: A*B.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: Generating DSP best_net3, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+DSP Report: operator best_net3 is absorbed into DSP best_net3.
+WARNING: [Synth 8-3917] design spread_detector has port input_ready driven by constant 1
+---------------------------------------------------------------------------------
+Finished Cross Boundary and Area Optimization : Time (s): cpu = 00:00:27 ; elapsed = 00:00:32 . Memory (MB): peak = 1554.691 ; gain = 779.145
+---------------------------------------------------------------------------------
+ Sort Area is  best_net3_0 : 0 0 : 3017 5738 : Used 1 time 0
+ Sort Area is  best_net3_0 : 0 1 : 2721 5738 : Used 1 time 0
+ Sort Area is  best_net3_3 : 0 0 : 3017 5738 : Used 1 time 0
+ Sort Area is  best_net3_3 : 0 1 : 2721 5738 : Used 1 time 0
+ Sort Area is  best_net3_4 : 0 0 : 3017 5738 : Used 1 time 0
+ Sort Area is  best_net3_4 : 0 1 : 2721 5738 : Used 1 time 0
+ Sort Area is  best_net3_5 : 0 0 : 3017 5738 : Used 1 time 0
+ Sort Area is  best_net3_5 : 0 1 : 2721 5738 : Used 1 time 0
+---------------------------------------------------------------------------------
+Start ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+
+DSP: Preliminary Mapping Report (see note below. The ' indicates corresponding REG is set)
++----------------+----------------+--------+--------+--------+--------+--------+------+------+------+------+-------+------+------+
+|Module Name     | DSP Mapping    | A Size | B Size | C Size | D Size | P Size | AREG | BREG | CREG | DREG | ADREG | MREG | PREG | 
++----------------+----------------+--------+--------+--------+--------+--------+------+------+------+------+-------+------+------+
+|spread_detector | A*B            | 18     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | (PCIN>>17)+A*B | 17     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | A*B            | 18     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | (PCIN>>17)+A*B | 17     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | A*B            | 18     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | (PCIN>>17)+A*B | 17     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | A*B            | 18     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | (PCIN>>17)+A*B | 17     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
++----------------+----------------+--------+--------+--------+--------+--------+------+------+------+------+-------+------+------+
+
+Note: The table above is a preliminary report that shows the DSPs inferred at the current stage of the synthesis flow. Some DSP may be reimplemented as non DSP primitives later in the synthesis flow. Multiple instantiated DSPs are reported only once.
+---------------------------------------------------------------------------------
+Finished ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Applying XDC Timing Constraints
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Applying XDC Timing Constraints : Time (s): cpu = 00:00:36 ; elapsed = 00:00:41 . Memory (MB): peak = 1750.191 ; gain = 974.645
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Timing Optimization
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Timing Optimization : Time (s): cpu = 00:00:39 ; elapsed = 00:00:44 . Memory (MB): peak = 1780.508 ; gain = 1004.961
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Technology Mapping
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Technology Mapping : Time (s): cpu = 00:00:40 ; elapsed = 00:00:45 . Memory (MB): peak = 1780.508 ; gain = 1004.961
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Flattening Before IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Flattening Before IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Final Netlist Cleanup
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Final Netlist Cleanup
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished IO Insertion : Time (s): cpu = 00:00:46 ; elapsed = 00:00:52 . Memory (MB): peak = 2043.129 ; gain = 1267.582
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Instances
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Instances : Time (s): cpu = 00:00:46 ; elapsed = 00:00:52 . Memory (MB): peak = 2043.129 ; gain = 1267.582
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Rebuilding User Hierarchy
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Rebuilding User Hierarchy : Time (s): cpu = 00:00:47 ; elapsed = 00:00:52 . Memory (MB): peak = 2043.129 ; gain = 1267.582
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Ports
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Ports : Time (s): cpu = 00:00:47 ; elapsed = 00:00:52 . Memory (MB): peak = 2043.129 ; gain = 1267.582
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Handling Custom Attributes
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Handling Custom Attributes : Time (s): cpu = 00:00:47 ; elapsed = 00:00:52 . Memory (MB): peak = 2043.129 ; gain = 1267.582
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Nets
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Nets : Time (s): cpu = 00:00:47 ; elapsed = 00:00:52 . Memory (MB): peak = 2043.129 ; gain = 1267.582
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Writing Synthesis Report
+---------------------------------------------------------------------------------
+
+DSP Final Report (the ' indicates corresponding REG is set)
++----------------+--------------+--------+--------+--------+--------+--------+------+------+------+------+-------+------+------+
+|Module Name     | DSP Mapping  | A Size | B Size | C Size | D Size | P Size | AREG | BREG | CREG | DREG | ADREG | MREG | PREG | 
++----------------+--------------+--------+--------+--------+--------+--------+------+------+------+------+-------+------+------+
+|spread_detector | A*B          | 17     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | PCIN>>17+A*B | 16     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | A*B          | 17     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | PCIN>>17+A*B | 16     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | A*B          | 17     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | PCIN>>17+A*B | 16     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | A*B          | 17     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|spread_detector | PCIN>>17+A*B | 16     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
++----------------+--------------+--------+--------+--------+--------+--------+------+------+------+------+-------+------+------+
+
+
+Report BlackBoxes: 
++-+--------------+----------+
+| |BlackBox name |Instances |
++-+--------------+----------+
++-+--------------+----------+
+
+Report Cell Usage: 
++------+--------+------+
+|      |Cell    |Count |
++------+--------+------+
+|1     |BUFG    |     1|
+|2     |CARRY4  |    78|
+|3     |DSP48E1 |     8|
+|4     |LUT1    |    44|
+|5     |LUT2    |   132|
+|6     |LUT3    |    54|
+|7     |LUT4    |    67|
+|8     |LUT5    |    54|
+|9     |LUT6    |   163|
+|10    |FDCE    |   455|
+|11    |IBUF    |   261|
+|12    |OBUF    |   133|
++------+--------+------+
+---------------------------------------------------------------------------------
+Finished Writing Synthesis Report : Time (s): cpu = 00:00:47 ; elapsed = 00:00:52 . Memory (MB): peak = 2043.129 ; gain = 1267.582
+---------------------------------------------------------------------------------
+Synthesis finished with 0 errors, 0 critical warnings and 1 warnings.
+Synthesis Optimization Runtime : Time (s): cpu = 00:00:33 ; elapsed = 00:00:48 . Memory (MB): peak = 2043.129 ; gain = 1195.680
+Synthesis Optimization Complete : Time (s): cpu = 00:00:47 ; elapsed = 00:00:53 . Memory (MB): peak = 2043.129 ; gain = 1267.582
+INFO: [Project 1-571] Translating synthesized netlist
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.009 . Memory (MB): peak = 2052.336 ; gain = 0.000
+INFO: [Netlist 29-17] Analyzing 86 Unisim elements for replacement
+INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
+WARNING: [Netlist 29-101] Netlist 'spread_detector' is not ideal for floorplanning, since the cellview 'spread_detector' contains a large number of primitives.  Please consider enabling hierarchy in synthesis if you want to do floorplanning.
+INFO: [Project 1-570] Preparing netlist for logic optimization
+INFO: [Opt 31-138] Pushed 0 inverter(s) to 0 load pin(s).
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.001 . Memory (MB): peak = 2055.988 ; gain = 0.000
+INFO: [Project 1-111] Unisim Transformation Summary:
+No Unisim elements were transformed.
+
+Synth Design complete | Checksum: fa3db90f
+INFO: [Common 17-83] Releasing license: Vivado_Synthesis
+17 Infos, 3 Warnings, 0 Critical Warnings and 0 Errors encountered.
+synth_design completed successfully
+synth_design: Time (s): cpu = 00:00:53 ; elapsed = 00:01:15 . Memory (MB): peak = 2055.988 ; gain = 1463.074
+Write ShapeDB Complete: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.013 . Memory (MB): peak = 2055.988 ; gain = 0.000
+INFO: [Common 17-1381] The checkpoint 'C:/Users/Himaska/Documents/Projects/Business_Projects/market-microstructure-engine/fpga/xilinx/xilinx.runs/synth_1/spread_detector.dcp' has been generated.
+INFO: [Vivado 12-24828] Executing command : report_utilization -file spread_detector_utilization_synth.rpt -pb spread_detector_utilization_synth.pb
+INFO: [Common 17-206] Exiting Vivado at Sat Oct 24 03:03:46 2026...

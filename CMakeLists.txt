@@ -35,7 +35,19 @@ add_executable(ws_ingestion
     src/storage/timescale_writer.cpp
 )
 
-# 3. Link software libraries AND the Verilated hardware module
+# 3. Create the metrics library for performance tracking
+add_library(metrics STATIC
+    hardware/metrics/metrics_collector.cpp
+    hardware/metrics/metrics_collector.h
+)
+
+# 4. Create the main ingestion engine executable
+add_executable(ws_ingestion
+    src/pipeline/main.cpp
+    src/storage/timescale_writer.cpp
+)
+
+# 5. Link software libraries AND the Verilated hardware module
 target_link_libraries(ws_ingestion PRIVATE
     Boost::boost
     OpenSSL::SSL
@@ -43,9 +55,11 @@ target_link_libraries(ws_ingestion PRIVATE
     PostgreSQL::PostgreSQL
     nlohmann_json::nlohmann_json
     spread_detector   # <-- Links your FPGA hardware module directly into C++
+    metrics           # <-- Links performance metrics library
 )
 
-# Include directories (ensures Vspread_detector.h can be found)
+# Include directories (ensures Vspread_detector.h and metrics can be found)
 target_include_directories(ws_ingestion PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/hardware/metrics
 )
