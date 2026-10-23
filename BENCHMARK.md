@@ -31,7 +31,7 @@
 - **RTL registered latency:** 1 rising-edge cycle in the Verilated model; no physical clock period measured
 - **FPGA target / bitstream:** Xilinx Artix-7 (`xc7a35tcpg236-1`, Speed Grade -1)
 - **Post-place-and-route Fmax:** Not measured (Implementation bypassed due to target footprint constraints)
-- **FPGA Resource Usage:** 
+- **FPGA Resource Usage:**
   - LUTs: 465 / 20,800 (2.24%)
   - FFs: 455 / 41,600 (1.09%)
   - CARRY4 primitives: 78 used for arithmetic
