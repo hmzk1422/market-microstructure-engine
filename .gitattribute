@@ -1,3 +1,4 @@
-*.sv linguist-detectable=true
-*.v linguist-detectable=true
-*.cpp linguist-detectable=true
+*.cpp linguist-language=C++
+*.hpp linguist-language=C++
+*.v linguist-language=SystemVerilog
+*.sv linguist-language=SystemVerilog
