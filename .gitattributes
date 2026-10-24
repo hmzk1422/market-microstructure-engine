@@ -11,3 +11,11 @@
 **/*.sv linguist-language=SystemVerilog
 **/*.v linguist-language=SystemVerilog
 **/*.vh linguist-language=SystemVerilog
+
+# Vendor third-party build scripts, toolchains, and Xilinx generated assets
+**/*.js linguist-vendored
+**/*.sh linguist-vendored
+**/*.ps1 linguist-vendored
+**/*.tcl linguist-vendored
+**/CMakeLists.txt linguist-vendored
+**/fpga/xilinx/** linguist-vendored
