@@ -1,4 +1,13 @@
-*.cpp linguist-language=C++
-*.hpp linguist-language=C++
-*.v linguist-language=SystemVerilog
-*.sv linguist-language=SystemVerilog
+# Exclude Python, scripts, and configs from language stats
+**/*.py linguist-vendored
+**/requirements.txt linguist-vendored
+**/run.ps1 linguist-vendored
+**/config.json linguist-vendored
+
+# Recursively override language detection for all subfolders
+**/*.cpp linguist-language=C++
+**/*.hpp linguist-language=C++
+**/*.h linguist-language=C++
+**/*.sv linguist-language=SystemVerilog
+**/*.v linguist-language=SystemVerilog
+**/*.vh linguist-language=SystemVerilog
