@@ -1,4 +1,0 @@
-*.cpp linguist-language=C++
-*.hpp linguist-language=C++
-*.v linguist-language=SystemVerilog
-*.sv linguist-language=SystemVerilog
