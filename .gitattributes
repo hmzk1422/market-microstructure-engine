@@ -1,5 +1,6 @@
 # Exclude Python, scripts, and configs from language stats
 **/*.py linguist-vendored
+**/*.ipynb linguist-vendored
 **/requirements.txt linguist-vendored
 **/run.ps1 linguist-vendored
 **/config.json linguist-vendored
