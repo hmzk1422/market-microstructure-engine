@@ -97,3 +97,6 @@ venv/
 *.hw_server/
 *.ip_cache/
 *.srcs/utils_1/
+
+market_data_engine.txt
+market_data_engine_benchmark.txt
