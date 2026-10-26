@@ -1,8 +1,8 @@
 #pragma once
 
 #include <chrono>
+#include <array>
 #include <cstdint>
-#include <string>
 
 enum class Venue {
     Bybit,
@@ -11,7 +11,7 @@ enum class Venue {
 
 struct QuoteUpdate {
     Venue venue;
-    std::string symbol;
+    std::array<char, 32> symbol{};
     std::uint32_t bid;
     std::uint32_t ask;
     std::int64_t exchange_time_ms;

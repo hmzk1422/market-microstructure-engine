@@ -16,12 +16,22 @@ module spread_detector (
     input  logic [15:0]       symbol_id_i,
     input  logic [31:0]       transaction_id_i,
 
+    // C++ strategy response returned into the simulated RTL execution edge.
+    input  logic              decision_valid_i,
+    input  logic              decision_execute_i,
+    input  logic [31:0]       decision_quantity_i,
+    input  logic [31:0]       decision_transaction_id_i,
+
     output logic              candidate_valid_o,
     output logic [1:0]        direction_o,
     output logic signed [48:0] net_profit_o,
     output logic [15:0]       symbol_id_o,
     output logic [31:0]       transaction_id_o,
-    output logic [31:0]       latency_o
+    output logic [31:0]       latency_o,
+    output logic              decision_ack_valid_o,
+    output logic              decision_executed_o,
+    output logic [31:0]       decision_quantity_o,
+    output logic [31:0]       decision_transaction_id_o
 );
 
     localparam logic [15:0] FEE_SCALE = 16'd10000;
@@ -142,12 +152,26 @@ module spread_detector (
             symbol_id_o       <= '0;
             transaction_id_o  <= '0;
             latency_o         <= '0;
+            decision_ack_valid_o <= 1'b0;
+            decision_executed_o <= 1'b0;
+            decision_quantity_o <= '0;
+            decision_transaction_id_o <= '0;
         end else begin
             candidate_valid_o <= 1'b0;
             direction_o       <= NO_DIRECTION;
             net_profit_o      <= '0;
             symbol_id_o       <= '0;
             transaction_id_o  <= '0;
+            decision_ack_valid_o <= 1'b0;
+
+            if (decision_valid_i) begin
+                decision_ack_valid_o <= 1'b1;
+                decision_executed_o <= decision_execute_i;
+                decision_quantity_o <= decision_execute_i
+                                           ? decision_quantity_i
+                                           : 32'd0;
+                decision_transaction_id_o <= decision_transaction_id_i;
+            end
 
             if (stage_valid) begin
                 // Difference is measured in clock cycles.

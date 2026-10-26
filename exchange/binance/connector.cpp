@@ -1,5 +1,4 @@
 #include "../websocket_common.h"
-#include "../file_logger.h"
 #include "../websocket_feed.h"
 
 #include <nlohmann/json.hpp>
@@ -8,6 +7,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -59,7 +59,9 @@ bool parse_quote(const std::string& raw, QuoteUpdate& update) {
     }
 
     update.venue = Venue::Binance;
-    update.symbol = data["s"].get<std::string>();
+    const auto symbol = data["s"].get<std::string>();
+    if (symbol.empty() || symbol.size() >= update.symbol.size()) return false;
+    std::memcpy(update.symbol.data(), symbol.data(), symbol.size());
     update.bid = static_cast<std::uint32_t>(bid * scale + 0.5L);
     update.ask = static_cast<std::uint32_t>(ask * scale + 0.5L);
     update.exchange_time_ms = data.value(
@@ -68,7 +70,7 @@ bool parse_quote(const std::string& raw, QuoteUpdate& update) {
                          std::chrono::system_clock::now().time_since_epoch())
                          .count()));
     update.received_at = std::chrono::steady_clock::now();
-    return !update.symbol.empty();
+    return true;
 }
 
 } // namespace
@@ -89,13 +91,9 @@ void run_binance_connector(
                     QuoteUpdate update{};
                     if (parse_quote(raw, update)) {
                         update.received_at = received_at;
-                        exchange_log("BINANCE", "quote_parsed symbol=" + update.symbol + " bid_raw=" + std::to_string(update.bid) + " ask_raw=" + std::to_string(update.ask));
                         publish(std::move(update));
-                    } else {
-                        exchange_log("BINANCE", "message_ignored: " + raw.substr(0, 300));
                     }
-                } catch (const std::exception& error) {
-                    exchange_log("BINANCE", std::string("parse_exception: ") + error.what() + " message=" + raw.substr(0, 300));
+                } catch (const std::exception&) {
                     malformed();
                 }
             },
