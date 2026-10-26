@@ -1,0 +1,21 @@
+# Exclude Python, scripts, and configs from language stats
+**/*.py linguist-vendored
+**/requirements.txt linguist-vendored
+**/run.ps1 linguist-vendored
+**/config.json linguist-vendored
+
+# Recursively override language detection for all subfolders
+**/*.cpp linguist-language=C++
+**/*.hpp linguist-language=C++
+**/*.h linguist-language=C++
+**/*.sv linguist-language=SystemVerilog
+**/*.v linguist-language=SystemVerilog
+**/*.vh linguist-language=SystemVerilog
+
+# Vendor third-party build scripts, toolchains, and Xilinx generated assets
+**/*.js linguist-vendored
+**/*.sh linguist-vendored
+**/*.ps1 linguist-vendored
+**/*.tcl linguist-vendored
+**/CMakeLists.txt linguist-vendored
+**/fpga/xilinx/** linguist-vendored
