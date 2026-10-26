@@ -15,7 +15,7 @@ Fee hurdle assumptions (from user):
 import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
-from preprocessing import prepare_signals, reconstruct_continuous_book
+from simulator.research.preprocessing import prepare_signals, reconstruct_continuous_book
 
 DB_URL = "postgresql://market:market@localhost:5433/market_data"
 

@@ -90,3 +90,11 @@ CI builds the Verilated executable and runs the RTL acknowledgement, strategy,
 mapped-ring, and network-model tests on Ubuntu. No physical FPGA implementation,
 Xilinx timing closure, hardware DMA path, kernel-bypass network stack, or live
 order execution is measured by this benchmark.
+
+
+```bash
+python3 hardware/test/latency_resource_report.py \
+  --binary hardware/build/market_data_engine \
+  --duration-sec 3600 --symbols 64
+```
+Returns a summary report for the system's overall performance throughout a certain period of time.

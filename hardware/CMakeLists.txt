@@ -158,6 +158,22 @@ if(BUILD_MARKET_DATA_ENGINE)
             TIMEOUT 30
         )
         set_tests_properties(synthetic_512_symbol_pipeline PROPERTIES LABELS "integration;performance")
+
+        find_package(Python3 COMPONENTS Interpreter QUIET)
+        if(Python3_Interpreter_FOUND)
+            add_test(
+                NAME performance_report_smoke
+                COMMAND ${Python3_EXECUTABLE}
+                        ${CMAKE_CURRENT_SOURCE_DIR}/test/latency_resource_report.py
+                        --binary $<TARGET_FILE:market_data_engine>
+                        --duration-sec 3
+                        --symbols 2
+            )
+            set_tests_properties(performance_report_smoke PROPERTIES
+                LABELS "performance;report"
+                TIMEOUT 45
+            )
+        endif()
     else()
         message(WARNING
             "Verilator was not found; market_data_engine is unavailable")

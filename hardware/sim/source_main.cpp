@@ -189,16 +189,23 @@ public:
 private:
     static std::size_t bucket_for(std::uint64_t ns) {
         if (ns < 1'000'000) return static_cast<std::size_t>(ns / 1'000);
-        if (ns < 1'000'000'000) {
-            return 1'000 + static_cast<std::size_t>((ns - 1'000'000) / 1'000'000);
+        if (ns < 100'000'000) {
+            return 1'000 + static_cast<std::size_t>(
+                                (ns - 1'000'000) / 10'000);
         }
-        return 2'000;
+        if (ns < 1'000'000'000) {
+            return 10'900 + static_cast<std::size_t>(
+                                 (ns - 100'000'000) / 100'000);
+        }
+        return 19'900;
     }
 
     double bucket_value(std::size_t bucket) const {
         if (bucket < 1'000) return static_cast<double>(bucket) * 1'000.0 + 500.0;
-        if (bucket < 2'000) return 1'000'000.0 +
-            static_cast<double>(bucket - 1'000) * 1'000'000.0 + 500'000.0;
+        if (bucket < 10'900) return 1'000'000.0 +
+            static_cast<double>(bucket - 1'000) * 10'000.0 + 5'000.0;
+        if (bucket < 19'900) return 100'000'000.0 +
+            static_cast<double>(bucket - 10'900) * 100'000.0 + 50'000.0;
         return static_cast<double>(max_ns_.load(std::memory_order_relaxed));
     }
 
@@ -214,7 +221,9 @@ private:
         return static_cast<double>(max_ns_);
     }
 
-    static constexpr std::size_t kHistogramBuckets = 2'001;
+    // 1 us resolution below 1 ms, 10 us up to 100 ms, then 100 us up to 1 s.
+    // This resolves the historical 62 us tail while keeping fixed memory use.
+    static constexpr std::size_t kHistogramBuckets = 19'901;
     std::array<std::atomic<std::uint64_t>, kHistogramBuckets> histogram_{};
     std::atomic<std::uint64_t> observed_{0};
     std::atomic<std::uint64_t> total_ns_{0};
@@ -228,12 +237,73 @@ struct RuntimeMetrics {
     LatencySamples modeled_singapore_total;
     LatencySamples modeled_tokyo_total;
     LatencySamples modeled_midpoint_total;
+    LatencySamples modeled_singapore_network;
+    LatencySamples modeled_tokyo_network;
+    LatencySamples modeled_midpoint_network;
+    LatencySamples websocket_interarrival_jitter;
     LatencySamples rtl_eval_wall_time;
     LatencySamples websocket_callback_to_strategy_enqueue;
     LatencySamples strategy_queue_wait;
     std::atomic<double> ws_interarrival_jitter_us{0.0};
     std::atomic<std::uint64_t> rtl_cpp_spread_mismatches{0};
 };
+
+struct RuntimeResourceSample {
+    double elapsed_seconds = 0.0;
+    double process_cpu_pct = std::numeric_limits<double>::quiet_NaN();
+    double system_cpu_pct = std::numeric_limits<double>::quiet_NaN();
+    double process_ram_mb = std::numeric_limits<double>::quiet_NaN();
+    double system_ram_used_mb = std::numeric_limits<double>::quiet_NaN();
+};
+
+std::string summarize_resource_samples(
+    const std::vector<RuntimeResourceSample>& samples,
+    double RuntimeResourceSample::*member, const char* unit,
+    const char* sum_unit) {
+    std::vector<std::pair<double, double>> values;
+    values.reserve(samples.size());
+    for (const auto& sample : samples) {
+        const double value = sample.*member;
+        if (std::isfinite(value)) {
+            values.emplace_back(sample.elapsed_seconds, value);
+        }
+    }
+    if (values.empty()) return "no valid samples";
+
+    std::vector<double> sorted;
+    sorted.reserve(values.size());
+    double sum = 0.0;
+    double integral = 0.0;
+    for (const auto& [elapsed, value] : values) {
+        (void)elapsed;
+        sorted.push_back(value);
+        sum += value;
+    }
+    for (std::size_t i = 1; i < values.size(); ++i) {
+        const double interval = values[i].first - values[i - 1].first;
+        if (interval > 0.0) {
+            integral += (values[i - 1].second + values[i].second) *
+                        0.5 * interval;
+        }
+    }
+    std::sort(sorted.begin(), sorted.end());
+    const auto percentile = [&sorted](double fraction) {
+        const auto index = static_cast<std::size_t>(
+            std::floor((sorted.size() - 1) * fraction));
+        return sorted[index];
+    };
+    std::ostringstream output;
+    output << std::fixed << std::setprecision(3)
+           << "samples=" << sorted.size()
+           << " p05=" << percentile(0.05) << unit
+           << " p50=" << percentile(0.50) << unit
+           << " p95=" << percentile(0.95) << unit
+           << " p99=" << percentile(0.99) << unit
+           << " max=" << sorted.back() << unit
+           << " sample_sum=" << sum << sum_unit
+           << " time_integral=" << integral << unit << "-seconds";
+    return output.str();
+}
 
 class ArrivalJitter {
 public:
@@ -302,6 +372,7 @@ double system_ram_used_mb() {
 double system_cpu_percent() {
 #ifdef _WIN32
     static std::uint64_t previous_total = 0, previous_idle = 0;
+    static bool initialized = false;
     FILETIME idle_time{}, kernel_time{}, user_time{};
     if (GetSystemTimes(&idle_time, &kernel_time, &user_time)) {
         const auto to_u64 = [](const FILETIME& time) {
@@ -310,7 +381,13 @@ double system_cpu_percent() {
         };
         const auto idle = to_u64(idle_time);
         const auto total = to_u64(kernel_time) + to_u64(user_time);
-        if (previous_total != 0 && total > previous_total) {
+        if (!initialized) {
+            previous_total = total;
+            previous_idle = idle;
+            initialized = true;
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        if (total > previous_total) {
             const auto delta_total = total - previous_total;
             const auto delta_idle = idle - previous_idle;
             previous_total = total;
@@ -322,6 +399,7 @@ double system_cpu_percent() {
     }
 #else
     static std::uint64_t previous_total = 0, previous_idle = 0;
+    static bool initialized = false;
     std::ifstream stats("/proc/stat");
     std::string label;
     std::uint64_t user = 0, nice = 0, system = 0, idle = 0,
@@ -329,7 +407,13 @@ double system_cpu_percent() {
     if (stats >> label >> user >> nice >> system >> idle >> iowait >> irq >> softirq >> steal) {
         const auto total = user + nice + system + idle + iowait + irq + softirq + steal;
         const auto idle_total = idle + iowait;
-        if (previous_total != 0 && total > previous_total) {
+        if (!initialized) {
+            previous_total = total;
+            previous_idle = idle_total;
+            initialized = true;
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        if (total > previous_total) {
             const auto delta_total = total - previous_total;
             const auto delta_idle = idle_total - previous_idle;
             previous_total = total;
@@ -344,10 +428,17 @@ double system_cpu_percent() {
 }
 
 double process_cpu_percent() {
-    static std::clock_t previous_cpu = std::clock();
-    static auto previous_wall = std::chrono::steady_clock::now();
+    static std::clock_t previous_cpu = 0;
+    static std::chrono::steady_clock::time_point previous_wall{};
+    static bool initialized = false;
     const auto now_cpu = std::clock();
     const auto now_wall = std::chrono::steady_clock::now();
+    if (!initialized) {
+        previous_cpu = now_cpu;
+        previous_wall = now_wall;
+        initialized = true;
+        return std::numeric_limits<double>::quiet_NaN();
+    }
     const auto wall_seconds = std::chrono::duration<double>(now_wall - previous_wall).count();
     const auto cpu_seconds = static_cast<double>(now_cpu - previous_cpu) / CLOCKS_PER_SEC;
     previous_cpu = now_cpu;
@@ -642,6 +733,24 @@ public:
     double cumulative_pnl() const {
         return cumulative_pnl_.load(std::memory_order_relaxed);
     }
+    std::uint64_t decision_count() const {
+        return decision_count_.load(std::memory_order_relaxed);
+    }
+    std::uint64_t candidate_decision_count() const {
+        return candidate_decision_count_.load(std::memory_order_relaxed);
+    }
+    std::uint64_t accepted_decision_count() const {
+        return accepted_decision_count_.load(std::memory_order_relaxed);
+    }
+    std::uint64_t warmup_rejection_count() const {
+        return warmup_rejection_count_.load(std::memory_order_relaxed);
+    }
+    std::uint64_t zscore_rejection_count() const {
+        return zscore_rejection_count_.load(std::memory_order_relaxed);
+    }
+    std::uint64_t no_candidate_count() const {
+        return no_candidate_count_.load(std::memory_order_relaxed);
+    }
 
 private:
     static double realized_pnl(const PaperPosition& position,
@@ -721,6 +830,24 @@ private:
                 decision.candidate, warmup_complete, zscore,
                 zscore_threshold_);
             const bool accepted = risk.accepted;
+            decision_count_.fetch_add(1, std::memory_order_relaxed);
+            if (decision.candidate) {
+                candidate_decision_count_.fetch_add(1,
+                                                    std::memory_order_relaxed);
+            }
+            if (accepted) {
+                accepted_decision_count_.fetch_add(1,
+                                                   std::memory_order_relaxed);
+            } else if (!decision.candidate) {
+                no_candidate_count_.fetch_add(1,
+                                             std::memory_order_relaxed);
+            } else if (!warmup_complete) {
+                warmup_rejection_count_.fetch_add(1,
+                                                   std::memory_order_relaxed);
+            } else {
+                zscore_rejection_count_.fetch_add(1,
+                                                  std::memory_order_relaxed);
+            }
             const auto decision_time_ms = std::chrono::duration_cast<
                 std::chrono::milliseconds>(std::chrono::system_clock::now()
                                                .time_since_epoch())
@@ -864,6 +991,12 @@ private:
     std::atomic<std::size_t> dropped_{0};
     std::atomic<std::uint64_t> trades_{0};
     std::atomic<double> cumulative_pnl_{0.0};
+    std::atomic<std::uint64_t> decision_count_{0};
+    std::atomic<std::uint64_t> candidate_decision_count_{0};
+    std::atomic<std::uint64_t> accepted_decision_count_{0};
+    std::atomic<std::uint64_t> warmup_rejection_count_{0};
+    std::atomic<std::uint64_t> zscore_rejection_count_{0};
+    std::atomic<std::uint64_t> no_candidate_count_{0};
     std::size_t printed_rejects_ = 0;
     std::thread thread_;
 };
@@ -1147,6 +1280,15 @@ int main(int argc, char** argv) {
                     std::nano>(roundtrip).count();
                 const auto modeled = network_model.sample(
                     roundtrip_ns, pending.ws_interarrival_jitter_us);
+                runtime_metrics.modeled_singapore_network.add(
+                    std::chrono::nanoseconds(static_cast<std::int64_t>(
+                        std::max(0.0, modeled.singapore_total_ns - roundtrip_ns))));
+                runtime_metrics.modeled_tokyo_network.add(
+                    std::chrono::nanoseconds(static_cast<std::int64_t>(
+                        std::max(0.0, modeled.tokyo_total_ns - roundtrip_ns))));
+                runtime_metrics.modeled_midpoint_network.add(
+                    std::chrono::nanoseconds(static_cast<std::int64_t>(
+                        std::max(0.0, modeled.midpoint_total_ns - roundtrip_ns))));
                 runtime_metrics.modeled_singapore_total.add(
                     std::chrono::nanoseconds(static_cast<std::int64_t>(
                         modeled.singapore_total_ns)));
@@ -1365,6 +1507,9 @@ int main(int argc, char** argv) {
             auto& jitter = arrival_jitter[symbol->second][
                 update.venue == Venue::Bybit ? 0 : 1];
             const auto observed_jitter_us = jitter.observe(update.received_at);
+            runtime_metrics.websocket_interarrival_jitter.add(
+                std::chrono::nanoseconds(static_cast<std::int64_t>(
+                    std::max(0.0, observed_jitter_us) * 1000.0)));
             quote = {update.bid, update.ask, update.exchange_time_ms,
                      update.received_at};
             if (pair.bybit.bid == 0 || pair.binance.bid == 0) {
@@ -1389,10 +1534,15 @@ int main(int argc, char** argv) {
 
         std::cout << "[SOURCE] mode=" << options.source << " ready\n";
         const auto engine_started_at = std::chrono::steady_clock::now();
+        std::vector<RuntimeResourceSample> resource_samples;
+        resource_samples.reserve(static_cast<std::size_t>(
+            options.duration_sec) + 2);
         auto last_status = std::chrono::steady_clock::now();
         std::atomic<bool> metrics_running{true};
         std::thread metrics_thread;
         metrics_thread = std::thread([&] {
+            (void)process_cpu_percent();
+            (void)system_cpu_percent();
             auto next_sample = std::chrono::steady_clock::now();
             while (metrics_running.load(std::memory_order_acquire)) {
                 next_sample += std::chrono::seconds(1);
@@ -1403,6 +1553,11 @@ int main(int argc, char** argv) {
                 const double system_cpu = system_cpu_percent();
                 const double process_ram = process_ram_mb();
                 const double system_ram = system_ram_used_mb();
+                resource_samples.push_back({
+                    std::chrono::duration<double>(
+                        std::chrono::steady_clock::now() - engine_started_at)
+                        .count(),
+                    process_cpu, system_cpu, process_ram, system_ram});
                 if (telemetry) {
                     telemetry->publish_metrics(
                         sampled_at_ms, process_cpu, system_cpu,
@@ -1544,8 +1699,20 @@ int main(int argc, char** argv) {
                     std::chrono::seconds(options.duration_sec)) {
                     running.store(false, std::memory_order_relaxed);
                 }
-                std::this_thread::sleep_for(
-                    std::chrono::milliseconds(options.synthetic_tick_ms));
+                // Keep the synthetic market cadence independent from the
+                // strategy roundtrip. Poll C++ replies during the idle part
+                // of each tick instead of making every decision wait for the
+                // full synthetic feed interval before RTL can acknowledge it.
+                const auto next_synthetic_tick =
+                    std::chrono::steady_clock::now() +
+                    std::chrono::milliseconds(options.synthetic_tick_ms);
+                while (running.load(std::memory_order_relaxed) &&
+                       std::chrono::steady_clock::now() <
+                           next_synthetic_tick) {
+                    process_decision_responses();
+                    std::this_thread::sleep_for(
+                        std::chrono::microseconds(100));
+                }
             }
 
             const auto now = std::chrono::steady_clock::now();
@@ -1626,6 +1793,9 @@ int main(int argc, char** argv) {
                                            engine_finished_at -
                                            engine_started_at)
                                            .count();
+        const RuntimeResourceSample latest_resource = resource_samples.empty()
+            ? RuntimeResourceSample{}
+            : resource_samples.back();
         std::ofstream benchmark_file("market_data_engine_benchmark.txt",
                                      std::ios::out | std::ios::trunc);
         if (benchmark_file) {
@@ -1651,13 +1821,28 @@ int main(int argc, char** argv) {
                            << "\nTelemetry queue drops: "
                            << (telemetry ? telemetry->dropped() : 0)
                            << "\nProcess CPU percent of one logical core: "
-                           << process_cpu_percent()
-                           << "\nSystem CPU percent: " << system_cpu_percent()
-                           << "\nProcess RAM MB: " << process_ram_mb()
-                           << "\nSystem RAM used MB: " << system_ram_used_mb()
+                           << latest_resource.process_cpu_pct
+                           << "\nSystem CPU percent: "
+                           << latest_resource.system_cpu_pct
+                           << "\nProcess RAM MB: "
+                           << latest_resource.process_ram_mb
+                           << "\nSystem RAM used MB: "
+                           << latest_resource.system_ram_used_mb
                            << "\nPaper trades: " << decision_worker.trades()
                            << "\nCumulative realized paper PnL: "
                            << decision_worker.cumulative_pnl()
+                           << "\n\nPaper decision counts:\n"
+                           << "all=" << decision_worker.decision_count()
+                           << " rtl_candidates="
+                           << decision_worker.candidate_decision_count()
+                           << " accepted="
+                           << decision_worker.accepted_decision_count()
+                           << " rejected_warmup="
+                           << decision_worker.warmup_rejection_count()
+                           << " rejected_zscore="
+                           << decision_worker.zscore_rejection_count()
+                           << " rejected_no_rtl_candidate="
+                           << decision_worker.no_candidate_count()
                            << "\n\nMeasured software latency (steady_clock, ns):\n"
                            << "WebSocket callback to Verilator output: "
                            << runtime_metrics.websocket_callback_to_rtl_output
@@ -1676,6 +1861,15 @@ int main(int argc, char** argv) {
                            << runtime_metrics.strategy_queue_wait.summary()
                            << "\nRTL-to-C++-to-RTL acknowledgement: "
                            << runtime_metrics.rtl_cpp_rtl_roundtrip.summary()
+                           << "\n\nModeled network-only round-trip latency (ns; no software component):\n"
+                           << "Singapore firm route: "
+                           << runtime_metrics.modeled_singapore_network.summary()
+                           << "\nTokyo firm route: "
+                           << runtime_metrics.modeled_tokyo_network.summary()
+                           << "\nMidpoint firm route: "
+                           << runtime_metrics.modeled_midpoint_network.summary()
+                           << "\nObserved WebSocket interarrival-jitter proxy (ns): "
+                           << runtime_metrics.websocket_interarrival_jitter.summary()
                            << "\nModeled Singapore firm total p50/p99 ns: "
                            << runtime_metrics.modeled_singapore_total.percentile(0.50)
                            << "/" << runtime_metrics.modeled_singapore_total.percentile(0.99)
@@ -1688,6 +1882,27 @@ int main(int argc, char** argv) {
                            << "\nObserved WebSocket interarrival jitter proxy us: "
                            << runtime_metrics.ws_interarrival_jitter_us.load(
                                   std::memory_order_relaxed)
+                           << "\n\nResource usage percentiles (one-second samples):\n"
+                           << "Process CPU (% of one logical core): "
+                           << summarize_resource_samples(
+                                  resource_samples,
+                                  &RuntimeResourceSample::process_cpu_pct,
+                                  "%", "%-samples")
+                           << "\nSystem CPU (% of all logical cores): "
+                           << summarize_resource_samples(
+                                  resource_samples,
+                                  &RuntimeResourceSample::system_cpu_pct,
+                                  "%", "%-samples")
+                           << "\nProcess resident RAM: "
+                           << summarize_resource_samples(
+                                  resource_samples,
+                                  &RuntimeResourceSample::process_ram_mb,
+                                  " MB", " MB-samples")
+                           << "\nSystem RAM used: "
+                           << summarize_resource_samples(
+                                  resource_samples,
+                                  &RuntimeResourceSample::system_ram_used_mb,
+                                  " MB", " MB-samples")
                            << "\n\nHardware and network evidence:\n"
                            << "RTL registered latency: 1 rising-edge cycle in the Verilated model; no physical clock period measured\n"
                            << "FPGA target / bitstream: not configured\n"
@@ -1702,6 +1917,19 @@ int main(int argc, char** argv) {
         } else {
             std::cerr << "[WARN] cannot create market_data_engine_benchmark.txt\n";
         }
+        std::cout << "[DECISION_SUMMARY] total="
+                  << decision_worker.decision_count()
+                  << " rtl_candidates="
+                  << decision_worker.candidate_decision_count()
+                  << " accepted="
+                  << decision_worker.accepted_decision_count()
+                  << " rejected_warmup="
+                  << decision_worker.warmup_rejection_count()
+                  << " rejected_zscore="
+                  << decision_worker.zscore_rejection_count()
+                  << " rejected_no_rtl_candidate="
+                  << decision_worker.no_candidate_count()
+                  << " paper_entries=" << decision_worker.trades() << '\n';
         std::cout << "[STOP] updates=" << updates
                   << " candidates=" << candidates
                   << " stale_quotes=" << stale_quotes

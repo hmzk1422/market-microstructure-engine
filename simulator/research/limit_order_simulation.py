@@ -23,8 +23,8 @@ strategy is more profitable for our arbitrage signals.
 import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
-from preprocessing import prepare_signals
-from liquidity_capacity import (
+from simulator.research.preprocessing import prepare_signals
+from simulator.research.liquidity_capacity import (
     reconstruct_book_with_depth,
     FEE_HURDLE_BPS,
     QTY_GRID,
