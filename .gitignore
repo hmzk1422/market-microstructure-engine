@@ -73,9 +73,6 @@ __pycache__/
 venv/
 *.pyc
 *.pyo
-Research/
-!research/
-!research/**
 
 # --- Xilinx Vivado / ISE Artifacts ---
 *.jou
