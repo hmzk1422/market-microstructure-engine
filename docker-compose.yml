@@ -27,10 +27,7 @@ services:
       target: runtime
     container_name: market-ingestion
     restart: unless-stopped
-    ports:
-      - "9090:9090"  # Metrics
     volumes:
-      - ./data:/app/data
       - ./logs:/app/logs
       # NOTE: If you do not have a config.json file in your project folder, 
       # comment out the next line or Docker will crash during startup!
@@ -43,7 +40,7 @@ services:
       - INGESTION_SYMBOLS=${INGESTION_SYMBOLS:-BTCUSDT,ETHUSDT}
       - TZ=UTC
     healthcheck:
-      test: ["CMD", "/app/ws_ingestion", "--help"] # FIXED name here
+      test: ["CMD", "/app/market_data_engine", "--help"]
       interval: 30s
       timeout: 10s
       retries: 3

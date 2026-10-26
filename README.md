@@ -2,89 +2,65 @@
 Author      : hmzk1422  
 Version     : v1.0.0
 
-> **Performance Summary & Verdict:** 
-> Our Verilated hardware filter core evaluates in a blazing **157 ns** median, but overall system end-to-end latency is bounded by OS threading at **62.6 µs median** with tail spikes up to **105.8 ms**. 
+> **Current scope:** This repository is a Verilator based paper trading and market data prototype. Historical latency figures below are from a prior run and are not a current performance guarantee. It does not send exchange orders or use a physical FPGA, DMA device, kernel bypass network stack, or fiber link.
 > 
 > * **Performance & Telemetry:** Read the full breakdown in **[BENCHMARK.md](./BENCHMARK.md)**.
 > * **Hardware Roadmap:** Moving to physical Xilinx target (changes to the code) **[FPGA_PERFORMANCE_PLAN.md](./FPGA_PERFORMANCE_PLAN.md)**.
-## Planned Architecture
+## Implemented Architecture
+
 ```mermaid
-flowchart TD
-    subgraph Python ["Python Research & DeepMarket Simulator"]
-        direction LR
-        A["Python Research &<br>DeepMarket Simulator"] -->|"1. Find parameters<br>(e.g., Threshold = 50)"| B["SystemVerilog RTL<br>(spread_detector.sv)"]
-    end
-
-    subgraph Hardware ["Hardware Acceleration"]
-        direction TB
-        B -->|"2. Enforced at hardware speed<br>on live exchange data"| C["C++ Ingestion &<br>Verilated Pipeline"]
-    end
+flowchart LR
+    B[Bybit WebSocket reader] --> QB[Bybit bounded SPSC ring]
+    X[Binance WebSocket reader] --> QX[Binance bounded SPSC ring]
+    QB --> P[Quote pairing and freshness check]
+    QX --> P
+    P --> RTL[SystemVerilog spread detector in Verilator]
+    RTL --> D[Bounded C++ decision ring]
+    D --> S[Rolling net-spread z-score and paper position manager]
+    P -->|fixed-size records| T[Low-priority Timescale writer]
+    S -->|decision records| T
+    T --> DB[(TimescaleDB)]
 ```
-Flow:  
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Exchange as Fiber Exchange
-    participant Pipeline as src/pipeline (C++/Rust TCP/IP)
-    participant Parser as hardware/rtl (Packet Parser)
-    participant Strategy as src/strategy (Risk Limits/Computations)
-    participant Exec as hardware/rtl (Execution Engine)
 
-    Exchange->>Pipeline: Raw Ethernet/TCP Frames (Market Data Feed)
-    Note over Pipeline,Parser: Low-level network unpacking
-    Pipeline->>Parser: Streaming Byte-Stream (rx_data + rx_valid)
-    
-    Note over Parser,Strategy: Hot Path (RTL Execution)
-    Parser->>Strategy: Parsed LOB State & Price Ticks (32-bit Prices, Asset IDs)
-    Strategy->>Exec: Arbitrage Evaluation & Spread Trigger (Valid Signal + Payload Struct)
-    
-    Note over Exec,Pipeline: Outbound Execution Loop
-    Exec->>Pipeline: Raw Execution Command (Order Payload: Side, Volume, Price)
-    Pipeline->>Exchange: Outformed TCP/IP Packets -> Fiber Cables
-```
-Explanation for System Architecture:
-- **Zero-Copy Ingestion (C++/Rust Network Layer)**: Replaces standard OS socket stacks with kernel-bypass polling (e.g., Solarflare EF_VI / DPDK) to ingest raw line-rate Ethernet frames directly into userspace memory buffers, eliminating context-switch jitter.
-- **Deterministic FPGA Offload (SystemVerilog / Xilinx RTL)**: Pips raw order-book parsing and cross-exchange arbitrage threshold detection onto custom hardware. By avoiding CPU branch-misprediction penalties and cache misses, the RTL evaluates spreads in deterministic single-digit
-- **Low-Latency Signal Interconnect (Verilated / Memory-Mapped I/O)**: Bridges the hardware detection trigger to the C++ orchestration layer via zero-copy shared memory rings and polled status registers (mmap), shaving microseconds off the standard Linux IPC overhead.
-- **Asymmetric Risk & Execution Guardrails (Hot/Cold Split)**: The hot path executes bare-metal order construction upon signal assertion while offloading non-critical logging, telemetry, and TimescaleDB persistence to asynchronous background threads to guarantee zero blocking latency on the trading loop.
+The default ABIDES input is a single simulated book mirrored to both venue
+inputs. Use the deterministic `synthetic` source for repeatable positive and
+negative spread scenarios across many symbols. WebSocket mode consumes public
+quotes. All three modes feed the same Verilated RTL and C++ paper strategy.
 
-> Scope note: These architecture bullets are conceptual, not implemented or measured properties of this repository. The runnable path below uses software sockets and Verilator simulation; it is not a physical FPGA, kernel-bypass, or fiber deployment.
+| Component | Implemented behavior | Not represented by this repository |
+|---|---|---|
+| Market data | Public Bybit and Binance best bid/ask streams; ABIDES and deterministic synthetic sources | Raw Ethernet ingress, synchronized venue clocks |
+| RTL | Synthesizable fixed-point cross-venue fee/spread candidate detector and decision acknowledgement, exercised through Verilator | A deployed FPGA, physical clock rate, place-and-route timing |
+| C++ strategy | Recomputes net spread from copied prices, applies a per-symbol 50-sample z-score gate, and returns simulated execute/quantity decisions to RTL | Exchange order submission, guaranteed real fills, queue position |
+| Transport | Named OS shared-memory ring for copied quote/RTL records plus bounded lock-free response queues | PCIe, device DMA, kernel bypass |
+| Telemetry | Asynchronous TimescaleDB price, decision, resource, latency, trade-count, and realized-PnL records | One-way network latency without clock synchronization |
 
-## Clearing House (Intermediary)
-Explanation for System Architecture
-- **Aggregation of Hybird Orderbook Data**: Queries from websocket directly, combines the aggregated liquidity in real markets as well as ABIDES-simulated data. Connects to Adversarial and User side by fiber cables.
-- **Executional Friction and Liquidity System**: Manages FIFO queue for orders, slippage, priority orders between MARL agents, etc. Matches orders between MARL agents or real liquidity (Assumption: Liquidity is accurately simulated by using real data but lacks adaptive response from the market. As such, MARL agents handles this).
-- **Data Modification**: Price data determined by real market or simulated market prices (Simulated market prices are constructed by synthetic features that explains only a portion of its variation (e.g., 50%)). However, new limit order/market order placements by player and MARL agents will cause drift in market price.
+### Planned extensions
 
-## Adversarial Side
-Explanation for System Architecture
-- **Toxic Order Flow Generation (Adversarial MARL / Momentum Ignition)**: Simulates predatory market participants and latency arbitrageurs designed to exploit information asymmetry, injecting toxic adverse selection and aggressive flow into the matching engine.
-- **Dynamic Quote Stuffing & Spoofing Vectors**: Employs algorithmic agents that flood the limit order book with transient liquidity, phantom cancels, and high-frequency quote updates to stress-test the user's hardware spread detection and risk guardrails under adverse market conditions.
-- **Adverse Selection & Queue Position Stress-Testing**: Probes the limits of the User Side's queue priority and fill probability models by simulating aggressive front-running and informed order cancellation cascades during high-volatility regimes.
-
-## System Component,Status,Architectural Scope & Notes
-[X] **Our Trading Firm (Core Pipeline)**: Implemented. C++ execution engine coupled directly to the Verilated SystemVerilog co-processor. Fully instrumented for telemetry; extensible for advanced arbitrage logic.
-
-[ ] **Clearing House / Venue Ingress**: Simulated (Data Feeder Only). Consumes public exchange WebSockets (Bybit/Binance). Not currently acting as an exchange matching engine or institutional intermediary.
-
-[ ] **Adversarial / Latency Injection**: Not Implemented. Planned for future testing phases to simulate adverse selection, order book slippage, and front-running conditions.
-
+A physical FPGA can replace the Verilator boundary when a board and device
+interface are available. The named shared-memory ring is a mapped-memory
+software surrogate; it does not claim PCIe or hardware DMA. Real order
+execution requires venue-specific order-entry, acknowledgement, partial-fill,
+cancel, risk-limit, and reconciliation handling. The app can pin its market and
+strategy threads; kernel CPU isolation remains a host configuration task.
 # Run in WSL (ABIDES or exchange WebSockets)
 
-The source-selectable application is `hardware/build/market_data_engine`. It uses
-the actual SystemVerilog spread detector through Verilator; the default source
-is `abides`.
+The source-selectable application is `hardware/build/market_data_engine`. It
+uses the SystemVerilog spread detector through Verilator. Sources are `abides`,
+`websocket`, and deterministic `synthetic`.
 
 ## Build
 
-**Use WLS/Debian Ubuntu.**
+**Use WSL/Debian Ubuntu.**
 Run these commands from WSL in the repository root. WSL needs CMake, a C++20
-compiler, Verilator, Boost.Beast headers, nlohmann-json, and OpenSSL development
-headers/libraries.
+compiler, Verilator, Boost.Beast headers, nlohmann-json, OpenSSL development
+libraries, and PostgreSQL client development headers/libraries. The container
+build installs these dependencies.
 
 ```bash
 cmake -S hardware -B hardware/build -DCMAKE_BUILD_TYPE=Release
-cmake --build hardware/build --target market_data_engine -j2
+cmake --build hardware/build --parallel 2
+ctest --test-dir hardware/build --output-on-failure
 ```
 
 ## ABIDES source (default)
@@ -99,7 +75,7 @@ python3 -u exchange/abides/exchange_simulator.py \
 Then run the application in the second terminal:
 
 ```bash
-./hardware/build/market_data_engine --source websocket --symbols BTCUSDT,ETHUSDT
+./hardware/build/market_data_engine --source abides --symbols BTCUSDT,ETHUSDT
 ```
 
 ## Public Bybit and Binance WebSockets
@@ -114,23 +90,97 @@ No simulator process is needed. Run from the repository root:
 The application subscribes to Bybit linear ticker and Binance book-ticker
 streams for each configured symbol. Use `Ctrl+C` to stop. It writes terminal
 output to `market_data_engine.txt` in the current directory. The log includes
-the first ten RTL inputs, periodic status, Verilator arbitrage alerts, and
-paper trade entries/exits; `--verbose` prints every processed RTL input.
+the first ten RTL inputs, periodic status, and paper trade entries/exits.
+`--verbose` prints every processed RTL input and Verilator arbitrage alerts.
 
 Both venues must have a fresh, complete quote before a symbol is sent to RTL.
 The RTL compares both executable buy/sell directions after the configured fees.
 The paper strategy assumes zero fees by default to show gross spread signals;
 set `--bybit-fee-bps` and `--binance-fee-bps` to your account's fees for net
-signals. Options `--min-profit` and `--max-quote-age-ms` override their defaults.
+signals. `--paper-slippage-bps` affects paper PnL only; the RTL candidate screen
+does not estimate slippage or available quantity. The RTL first emits
+fee-adjusted profitable spread candidates. C++ then
+computes a rolling z-score from that same net cross-venue spread and only enters
+a paper position after 50 prior observations when it meets
+`--zscore-threshold` (default `2.0`). Options `--min-profit`,
+`--max-quote-age-ms`, and `--zscore-threshold` configure these gates.
 The executable reports paper trades only and does not send orders. ABIDES supplies one simulated book,
 which is mirrored to the two RTL venue inputs for exercising the pipeline; it
 does not represent two independent venues or demonstrate arbitrage.
 
-Data flow is source → C++ adapter → Verilated RTL → C++ paper trade manager.
-The WebSocket adapter and decision worker use bounded, mutex-protected queues;
-each drops its oldest queued item on overflow. This executable does not
-currently persist updates to TimescaleDB. The simulated “fiber” is a logical
-data-path abstraction, not a physical network interface or FPGA deployment.
+Data flow is WebSocket readers → bounded per-venue lock-free rings holding
+fixed-size quote records → Verilated RTL spread/fee screen → named mapped-memory
+ring carrying prices and the RTL candidate → C++ recomputation and z-score → a
+bounded response ring → Verilated RTL execution acknowledgement and quantity.
+The mapping is a software DMA stand-in, not a device interface. Strategy
+handoffs and telemetry records are preallocated; JSON decoding and network I/O
+stay on feed threads. On queue overflow, the incoming item is dropped and counted. The async,
+lower-priority TimescaleDB writer receives fixed-size in-memory records; it
+persists `market_prices`, per-message `latency_samples`, `strategy_decisions`,
+and one-second `runtime_metrics` samples without making database calls from the
+market loop. Set
+`TIMESCALE_CONN` to configure it. For a local WSL run with the bundled database,
+start it with `docker compose up -d timescaledb` and set
+`TIMESCALE_CONN='host=localhost port=5433 dbname=market_data user=market password=market'`.
+The metrics include process and system CPU, process and system RAM, p50/p95/p99
+and maximum RTL-to-C++-to-RTL acknowledgement latency, modeled route p50/p99 by
+firm location, WebSocket interarrival-jitter proxy, paper trade count, and
+cumulative realized paper PnL. Price rows also store exchange event time and event age;
+because exchange and local clocks can differ, event age is not a one-way
+network latency measurement. Queue overflow and database write failures are
+counted, and unavailable samples are stored as NULL. Latency percentiles use a
+fixed histogram (1 μs buckets below 1 ms and 1 ms buckets below 1 s). Use
+`--latency-every-message` to print each paired quote's software round trip and
+the three modeled route totals. Per-message printing adds load, so use it to
+inspect individual transactions; use the histogram for performance runs.
+`[SYSTEM]` prints CPU, RAM, and latency summaries once per second. `--market-cpu N`
+and `--strategy-cpu N` pin those threads where the OS allows it; `isolcpus`
+remains a host boot setting.
+
+The executable supports up to 65,534 configured symbol IDs, but that limit is
+an interface bound, not evidence of tested throughput at hundreds of assets.
+Run a deterministic 512-symbol pipeline load without exchange or database
+access with:
+
+```bash
+symbols=$(python3 -c 'print(",".join(f"ASSET{i:04d}" for i in range(512)))')
+./hardware/build/market_data_engine --source synthetic --symbols "$symbols" \
+  --duration-sec 3 --synthetic-tick-ms 10 --no-telemetry
+```
+
+The fixture alternates narrow and wide positive spreads; it measures the
+software simulation pipeline, not real venue performance or profitability.
+
+### Colocation and network scenario
+
+The selected comparison is a firm in Singapore, a firm in Tokyo, and a firm at
+their geographic midpoint. The propagation estimate uses city coordinates, a
+1.468 fiber refractive index, and a 1.35 assumed route stretch. Noise combines
+a mean-reverting OU-style process with rare positive Pareto spikes. Its OU scale
+uses an EWMA absolute deviation of observed WebSocket message interarrival
+times (OU mean 50 μs, per-event reversion 0.08; shock sigma is 25% of that
+proxy). Pareto spikes use probability 0.001, shape 2.5, and a scale of at least
+50 μs. Interarrival variation is a jitter proxy, not direct one-way network
+latency. The model adds software round-trip time and the slower exchange-leg
+RTT; it does not inject delays into the measured software round trip.
+`--network-seed` makes runs reproducible.
+
+For a small live display of every software round trip and the modeled location
+totals, run:
+
+```bash
+./hardware/build/market_data_engine --source synthetic --symbols BTCUSDT \
+  --duration-sec 1 --synthetic-tick-ms 100 --no-telemetry \
+  --latency-every-message --network-seed 42
+```
+
+Bybit's help material describes its API servers as running in AWS Singapore.
+The Tokyo Binance endpoint is a scenario assumption: a Tokyo corporate office
+does not establish where an API gateway or matching engine runs. Treat both
+endpoint coordinates as assumptions until verified with measured routes or
+provider disclosures. See [Bybit's connection guidance](https://www.bybit.com/en/help-center/article/How-to-Optimize-Trading-Experience?category=0ba248783af2b745a6).
+The simulation compares geographic propagation; it does not model order-book
+competition, liquidity, or market-maker response.
 
 ## RTL interface and verification
 
@@ -145,23 +195,30 @@ net profit, 16-bit symbol ID, and 32-bit transaction ID. A candidate is emitted
 only when net profit is positive and strictly greater than `min_profit_i`.
 Invalid inputs clear the candidate output. Valid-range arithmetic is covered
 by boundary tests; invalid fees and zero prices are rejected.
+After C++ evaluates the copied quote record, it returns execute/reject,
+quantity, and transaction ID. RTL acknowledges the response on the next rising
+edge. The measured software round trip starts just before C++ handoff and ends
+when that matching RTL acknowledgement is observed. It includes C++ queueing,
+strategy computation, response queueing, and the Verilator handshake; it excludes
+WebSocket transport and exchange order I/O.
 
-Run the independent C++ reference-model RTL tests and produce a VCD waveform:
+The test suite includes the RTL reference model and decision acknowledgement,
+strategy warm-up, zero-variance, rolling-eviction, risk-gate, memory-mapped ring
+ordering, deterministic 512-symbol histories, and network-model route/noise
+checks. When Verilator is installed, the RTL test also produces a VCD waveform:
 
 ```bash
 ctest --test-dir hardware/build --output-on-failure
 ```
 
 The waveform is `hardware/build/spread_detector.vcd` and includes clock, reset,
-input, valid, and candidate signals. The test covers reset, both directions,
-threshold equality, arithmetic limits, invalid inputs, consecutive
-transactions, and 512 synthetic symbol IDs.
+input, candidate, and C++ decision acknowledgement signals. The RTL test covers
+reset, both directions, threshold equality, arithmetic limits, invalid inputs,
+consecutive inputs, and execute/reject/quantity return behavior.
 
-Vivado was not available in the verification environment. Yosys 0.52 synthesis
-completed successfully using `hardware/rtl/synth.ys`; all `check` passes
-reported zero problems. The final generic mapped netlist contains 14,613
-generic cells, including 100 flip-flops. This is not a Xilinx-specific resource
-estimate. The full output is saved in `hardware/rtl/synthesis_report.txt`.
+`hardware/rtl/synth.ys` is a generic Yosys flow. This repository does not include
+verified device-specific resource utilization, place-and-route timing closure,
+or a bitstream. Do not treat generic Yosys cell counts as FPGA resources.
 # Summary and Results
 > NOTE: This system is instrumented for functional verification and architectural demonstration via Verilator in a virtualized WSL environment. Absolute latency metrics reflect software simulation and OS virtualization overhead, not bare-metal hardware performance.
 # Citations

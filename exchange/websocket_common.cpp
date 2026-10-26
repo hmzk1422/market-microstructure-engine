@@ -113,11 +113,6 @@ void run_session(
             beast::flat_buffer buffer;
             ws.read(buffer);
             const auto raw = beast::buffers_to_string(buffer.data());
-            static std::atomic<unsigned long long> received{0};
-            const auto count = ++received;
-            if (count <= 5 || count % 1000 == 0) {
-                exchange_log(venue, "message_received count=" + std::to_string(count) + " bytes=" + std::to_string(raw.size()) + " sample=" + raw.substr(0, 300));
-            }
             on_message(raw);
         }
     } catch (...) {

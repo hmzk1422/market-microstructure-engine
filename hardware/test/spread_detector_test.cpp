@@ -1,6 +1,7 @@
 #include "Vspread_detector.h"
 #include "verilated.h"
 #include "verilated_vcd_c.h"
+#include "spread_math.h"
 
 #include <chrono>
 #include <cstdint>
@@ -59,6 +60,10 @@ struct Simulation {
         dut.min_profit_i = 0;
         dut.symbol_id_i = 0;
         dut.transaction_id_i = 0;
+        dut.decision_valid_i = 0;
+        dut.decision_execute_i = 0;
+        dut.decision_quantity_i = 0;
+        dut.decision_transaction_id_i = 0;
         dut.eval();
         dump();
     }
@@ -93,7 +98,9 @@ struct Simulation {
         dut.eval();
         dump();
         if (dut.candidate_valid_o || dut.direction_o || dut.net_profit_o ||
-            dut.symbol_id_o || dut.transaction_id_o) {
+            dut.symbol_id_o || dut.transaction_id_o ||
+            dut.decision_ack_valid_o || dut.decision_executed_o ||
+            dut.decision_quantity_o || dut.decision_transaction_id_o) {
             throw std::runtime_error("reset did not clear outputs");
         }
         dut.rst_n = 1;
@@ -134,6 +141,19 @@ struct Simulation {
 
     void drive(const QuotePair& q, const std::string& label, bool print = true) {
         const Expected expected = reference(q);
+        if (q.input_valid && q.quotes_valid && q.bybit_bid && q.bybit_ask &&
+            q.binance_bid && q.binance_ask && q.bybit_fee_bps <= kFeeScale &&
+            q.binance_fee_bps <= kFeeScale) {
+            const auto cpp = strategy::calculate_net_spread(
+                q.bybit_bid, q.bybit_ask, q.binance_bid, q.binance_ask,
+                q.bybit_fee_bps, q.binance_fee_bps);
+            if (cpp.value != expected.net_profit ||
+                cpp.direction != expected.direction) {
+                throw std::runtime_error(
+                    "C++ copied-price spread disagrees with reference at " +
+                    label);
+            }
+        }
         const bool old_candidate = dut.candidate_valid_o != 0;
         const std::int64_t old_net = signed_net_profit();
         const auto old_direction = dut.direction_o;
@@ -141,6 +161,10 @@ struct Simulation {
         const auto old_transaction_id = dut.transaction_id_o;
         const auto old_valid = dut.candidate_valid_o;
         dut.clk = 0;
+        dut.decision_valid_i = 0;
+        dut.decision_execute_i = 0;
+        dut.decision_quantity_i = 0;
+        dut.decision_transaction_id_i = 0;
         dut.input_valid = q.input_valid;
         dut.quotes_valid = q.quotes_valid;
         dut.bybit_bid_i = q.bybit_bid;
@@ -165,6 +189,13 @@ struct Simulation {
         dut.clk = 1;
         dut.eval();
         dump();
+        dut.clk = 0;
+        dut.input_valid = 0;
+        dut.eval();
+        dump();
+        dut.clk = 1;
+        dut.eval();
+        dump();
         ++cycle;
 
         const std::int64_t actual_net = signed_net_profit();
@@ -184,6 +215,10 @@ struct Simulation {
                                      q.binance_fee_bps <= kFeeScale
                                          ? q.transaction_id : 0)) {
             throw std::runtime_error("RTL/reference mismatch at " + label);
+        }
+        if (q.input_valid && dut.latency_o != 1) {
+            throw std::runtime_error(
+                "spread candidate must report one-cycle registered latency");
         }
         if (old_candidate && !q.input_valid) {
             throw std::runtime_error("candidate_valid did not clear on invalid cycle");
@@ -208,6 +243,30 @@ struct Simulation {
         dut.clk = 0;
         dut.eval();
         dump();
+    }
+
+    void acknowledge_decision(std::uint32_t transaction_id, bool execute,
+                              std::uint32_t quantity) {
+        dut.clk = 0;
+        dut.input_valid = 0;
+        dut.decision_valid_i = 1;
+        dut.decision_execute_i = execute;
+        dut.decision_quantity_i = quantity;
+        dut.decision_transaction_id_i = transaction_id;
+        dut.eval();
+        dut.clk = 1;
+        dut.eval();
+        if (!dut.decision_ack_valid_o)
+            throw std::runtime_error("RTL did not acknowledge C++ decision");
+        if (dut.decision_transaction_id_o != transaction_id)
+            throw std::runtime_error("RTL ack changed transaction ID");
+        if (static_cast<bool>(dut.decision_executed_o) != execute)
+            throw std::runtime_error("RTL ack changed execute/reject result");
+        if (dut.decision_quantity_o != (execute ? quantity : 0))
+            throw std::runtime_error("RTL returned quantity for rejected decision");
+        dut.clk = 0;
+        dut.decision_valid_i = 0;
+        dut.eval();
     }
 };
 
@@ -236,6 +295,8 @@ int main(int argc, char** argv) {
         require(sim.dut.candidate_valid_o == 1 &&
                     sim.dut.direction_o == kBuyBybitSellBinance,
                 "expected BUY_BYBIT_SELL_BINANCE candidate");
+        sim.acknowledge_decision(q.transaction_id, true, 3);
+        sim.acknowledge_decision(q.transaction_id + 1, false, 0);
         sim.reset();
 
         q = {102, 103, 100, 101, 0, 0, 0, 8, 2};

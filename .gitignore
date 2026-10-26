@@ -73,7 +73,6 @@ __pycache__/
 venv/
 *.pyc
 *.pyo
-Research/
 
 # --- Xilinx Vivado / ISE Artifacts ---
 *.jou
@@ -98,3 +97,6 @@ Research/
 *.hw_server/
 *.ip_cache/
 *.srcs/utils_1/
+
+market_data_engine.txt
+market_data_engine_benchmark.txt

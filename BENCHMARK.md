@@ -1,52 +1,66 @@
-# Market Data Engine Runtime Benchmark
+# Benchmark and Evidence
 
-## Initial Test Configuration & Results
-- **Source:** WebSocket
-- **Symbols:** 2
-- **Runtime seconds:** 21.305
-- **Accepted RTL updates:** 1520
-- **RTL candidates:** 1520
-- **Throughput updates/sec:** 71.346
-- **Stale quote rejections:** 174
-- **WebSocket dropped updates:** 0
-- **WebSocket malformed messages:** 0
-- **Decision queue drops:** 0
+## Historical WebSocket run
 
-## Measured Software Latency (steady_clock, ns)
+The values below were recorded before the current strategy, queue, and telemetry
+changes. They are retained as historical context only; they are not a baseline
+for the current code and have not been reproduced in this revision.
 
-| Metric | Observed | Retained | Mean (ns) | p50 (ns) | p95 (ns) | p99 (ns) | Max (ns) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| **WebSocket callback to Verilator output** | 1520 | 1520 | 451,899 | 60,719 | 170,079 | 10,550,357 | 84,252,201 |
-| **Verilator eval wall time** | 1520 | 1520 | 817 | 157 | 3,849 | 5,586 | 18,184 |
-| **WebSocket callback to strategy enqueue** | 1520 | 1520 | 641,829 | 62,605 | 209,022 | 18,589,750 | 105,808,764 |
-| **Strategy queue wait** | 1520 | 1520 | 91,850 | 28,844 | 79,995 | 161,705 | 42,746,518 |
+| Measurement | Historical value |
+| --- | ---: |
+| Source / configured symbols | WebSocket / 2 |
+| Runtime / updates | 21.305 s / 1,520 |
+| Throughput | 71.3 RTL updates/s |
+| WebSocket callback to Verilator output, p50 / p99 / max | 60.719 μs / 10.550 ms / 84.252 ms |
+| Verilator eval wall time, p50 / p99 / max | 157 ns / 5.586 μs / 18.184 μs |
+| Callback to strategy enqueue, p50 / p99 / max | 62.605 μs / 18.590 ms / 105.809 ms |
+| Strategy queue wait, p50 / p99 / max | 28.844 μs / 161.705 μs / 42.747 ms |
 
-### Metric Definitions
-- **WebSocket callback to Verilator output:** The time from the exact moment a market update hits the WebSocket network callback until the Verilated hardware filter finishes processing and outputs a decision.
-- **Verilator eval wall time:** The pure, isolated execution time of the hardware simulation itself (`dut->eval()`). Measures how long the C++ CPU takes to execute the compiled SystemVerilog logic model.
-- **WebSocket callback to strategy enqueue:** Total end-to-end latency of the pipeline—from the moment the WebSocket reads a message until the filtered signal is successfully queued up for the C++ strategy engine (Z-score).
-- **Strategy queue wait:** Time a filtered market tick waits in a queue before the strategy consumer thread picks it up.
+These are software timings from a WebSocket callback through a Verilated model.
+`eval()` wall time measures the CPU executing generated C++ for the RTL; it is
+not FPGA timing. Percentiles from separate stages cannot be added to infer an
+end-to-end percentile, and the previous report's arithmetic did that. The
+previous report also listed FPGA resource numbers without traceable target-flow
+evidence. Do not present those as verified hardware results.
 
-## Hardware and Network Evidence
-- **RTL registered latency:** 1 rising-edge cycle in the Verilated model; no physical clock period measured
-- **FPGA target / bitstream:** Xilinx Artix-7 (`xc7a35tcpg236-1`, Speed Grade -1)
-- **Post-place-and-route Fmax:** Not measured (Implementation bypassed due to target footprint constraints)
-- **FPGA Resource Usage:**
-  - LUTs: 465 / 20,800 (2.24%)
-  - FFs: 455 / 41,600 (1.09%)
-  - CARRY4 primitives: 78 used for arithmetic
-  - DSP48E1 slices: 8 / 90 (8.89%)
-- **Fiber receive / transmit latency:** Not measured (callback timing starts after WebSocket read)
-- **Order dispatch latency:** Not measured (executable emits paper decisions; no live exchange orders sent)
-- **mmap / FPGA DMA:** Not present (Verilator is statically linked into the host C++ process)
+## Current measurement contract
 
----
+The runnable application reports callback-to-RTL, callback-to-paper-decision,
+RTL evaluation, strategy queue wait, and a new RTL→C++→RTL acknowledgement
+round-trip. The latter begins at C++ handoff and ends when the matching
+transaction ID is acknowledged by the Verilated RTL. The optional
+`--latency-every-message` mode prints each paired quote's round trip. A fixed
+histogram keeps recording bounded; percentiles are approximate (1 μs buckets
+below 1 ms, 1 ms buckets below 1 s). These are local software timings and do
+not include WebSocket transport before callback entry or exchange order I/O.
 
-## Conclusion & Architectural Verdict
-Ran benchmark and synthesis; implementation was intentionally bypassed.
-- The RTL design functions as a high-speed streaming IP core. Top-level simulation and verification are executed via Verilator, coupling a 1-cycle latency SystemVerilog filter directly to a high-performance C++ quantitative execution engine over a simulated host interface.
-- For a true production-grade deployment, inputs and outputs must be serialized into a narrow streaming interface (such as an AXI4-Stream bus with valid/ready/last handshakes) rather than mapping parallel pins across an incompatible footprint.
+The application also compares three *modeled* network routes: firms in
+Singapore, Tokyo, and their geographic midpoint. Propagation uses a 1.35 route
+stretch and fiber refractive index of 1.468. OU-style jitter is calibrated from
+WebSocket interarrival variation and rare positive Pareto spikes add a heavy
+tail. These assumptions produce an illustrative model, not measured exchange
+server locations or actual route latency. Bybit's API server location is
+described as Singapore in its own help material; the Binance Tokyo endpoint is
+an explicit scenario assumption, not a verified matching-engine location.
 
+The strategy worker reads fixed-size price/candidate records from a named OS
+shared-memory ring, recomputes the fee-adjusted spread, and returns a decision
+and quantity through a separate ring for an RTL acknowledgement. This is a
+software DMA stand-in. TimescaleDB stores raw scaled quote prices in
+`market_prices`, per-input RTL candidate and C++ strategy results in
+`strategy_decisions`, one row per RTL acknowledgement in `latency_samples`, and
+once-per-second resource/latency/trade/PnL snapshots in `runtime_metrics`.
+Each latency row preserves monotonic `t_send_steady_ns` and
+`t_receive_steady_ns` alongside their round-trip difference.
+`exchange_event_age_ms`
+is local receive time minus the exchange event timestamp; clock offset means
+it is not a one-way network latency measurement. PnL is paper realized PnL and
+uses the configured fees, slippage, and fixed position size. The default fee
+and slippage values are zero for demonstration.
+
+## Reproduce
+
+Build and run the correctness suite:
 ### Pipeline Latency Model
 Let:
 - $T_{\text{e2e}}$ = WebSocket callback to strategy enqueue (Total system latency)
@@ -63,11 +77,42 @@ Mapping empirical data into the pipeline model yields:
 - **At Tail / Worst-Case Spike ($Max$):**
   $$105,808,764\text{ ns} \approx 84,252,201\text{ ns } (T_{\text{ingress}} \text{ spike}) + 42,746,518\text{ ns } (T_{\text{qwait}} \text{ spike})$$
 
-### Final Verdict
-Our system operated at a median of **62.6 microseconds ($\mu s$)** with a worst-case tail spike of **105.8 milliseconds ($ms$)**. 
+```bash
+cmake -S hardware -B hardware/build -DCMAKE_BUILD_TYPE=Release
+cmake --build hardware/build --parallel 2
+ctest --test-dir hardware/build --output-on-failure
+```
 
-**Verdict:** Not optimized for live cross-exchange arbitrage yet ($62,605\text{ ns}$ exceeds the elite institutional $\sim 150-500\text{ ns}$ hardware boundary).
+The strategy unit test exercises warm-up, zero variance, rolling eviction, risk
+gating, and 512 independent symbol windows. To exercise the complete Verilated
+pipeline across 512 synthetic symbols, run from the repository root in WSL:
 
+```bash
+symbols=$(python3 -c 'print(",".join(f"ASSET{i:04d}" for i in range(512)))')
+./hardware/build/market_data_engine --source synthetic --symbols "$symbols" \
+  --duration-sec 3 --synthetic-tick-ms 10 --no-telemetry
+```
+
+The synthetic source creates deterministic wide-positive, narrow-positive, and
+negative spread phases, so this run exercises warm-up, z-score acceptance,
+paper entries/exits, bounded queue drops, and measured software latency without
+exchange access or a database. The
+printed update, candidate, trade, and drop counts should accompany any claimed
+throughput result. The synthetic feed is a load fixture, not evidence of
+exchange performance or profitability.
+
+CI builds the Verilated executable and runs the RTL acknowledgement, strategy,
+mapped-ring, and network-model tests on Ubuntu. No physical FPGA implementation,
+Xilinx timing closure, hardware DMA path, kernel-bypass network stack, or live
+order execution is measured by this benchmark.
+
+
+```bash
+python3 hardware/test/latency_resource_report.py \
+  --binary hardware/build/market_data_engine \
+  --duration-sec 3600 --symbols 64
+```
+Returns a summary report for the system's overall performance throughout a certain period of time.
 ## Architectural Bottleneck Analysis
 - **The Success:** The Verilator execution time ($T_{\text{eval}}$) runs at a median of **157 ns**, proving that the core hardware filter design executes at elite, hundred-nanosecond HFT speeds.
 - **The Bottleneck:** The system is constrained entirely by software wrappers—standard WebSockets, operating system thread scheduling, context switches, and queue synchronization wait times—which introduce microsecond-to-millisecond jitter.

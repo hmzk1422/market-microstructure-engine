@@ -1,11 +1,11 @@
 #include "../websocket_common.h"
-#include "../file_logger.h"
 #include "../websocket_feed.h"
 
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -44,7 +44,8 @@ bool parse_quote(const std::string& raw, QuoteUpdate& update) {
     const std::string symbol = data.value("symbol", data.value("s", ""));
     const std::string bid_text = data.value("bid1Price", "");
     const std::string ask_text = data.value("ask1Price", "");
-    if (symbol.empty() || bid_text.empty() || ask_text.empty()) {
+    if (symbol.empty() || symbol.size() >= update.symbol.size() ||
+        bid_text.empty() || ask_text.empty()) {
         return false;
     }
 
@@ -57,7 +58,7 @@ bool parse_quote(const std::string& raw, QuoteUpdate& update) {
     }
 
     update.venue = Venue::Bybit;
-    update.symbol = symbol;
+    std::memcpy(update.symbol.data(), symbol.data(), symbol.size());
     update.bid = static_cast<std::uint32_t>(bid * scale + 0.5L);
     update.ask = static_cast<std::uint32_t>(ask * scale + 0.5L);
     update.exchange_time_ms = message.value("ts", std::int64_t{0});
@@ -84,13 +85,9 @@ void run_bybit_connector(
                     QuoteUpdate update{};
                     if (parse_quote(raw, update)) {
                         update.received_at = received_at;
-                        exchange_log("BYBIT", "quote_parsed symbol=" + update.symbol + " bid_raw=" + std::to_string(update.bid) + " ask_raw=" + std::to_string(update.ask));
                         publish(std::move(update));
-                    } else {
-                        exchange_log("BYBIT", "message_ignored: " + raw.substr(0, 300));
                     }
                 } catch (const std::exception&) {
-                    exchange_log("BYBIT", "parse_exception: " + raw.substr(0, 300));
                     malformed();
                 }
             },

@@ -1,0 +1,13 @@
+# ninja log v7
+35	2257	8147194319857401	CMakeFiles/sim_spread_detector.dir/2958f7408fd9a32337353e794d5736f2/market-microstructure-engine/exchange/socket_reader.cpp.obj	b1da997da83f886f
+28	2681	8147194319787285	CMakeFiles/sim_spread_detector.dir/sim/sim_main.cpp.obj	f2fe1b790dfb7eb2
+2682	3448	8147194346321357	CMakeFiles/strategy_core_test.dir/test/strategy_core_test.cpp.obj	92e1525d19e6a4e2
+2261	3810	8147194342119025	CMakeFiles/sim_spread_detector.dir/2958f7408fd9a32337353e794d5736f2/market-microstructure-engine/exchange/terminal_plot.cpp.obj	d1383fb264cdb3a2
+3448	4199	8147194353988193	CMakeFiles/spsc_ring_test.dir/test/spsc_ring_test.cpp.obj	829ec012f64a7c13
+4200	5202	8147194361504868	CMakeFiles/network_latency_model_test.dir/test/network_latency_model_test.cpp.obj	ac2f485b34dced05
+5202	5426	8147194371530269	sim_spread_detector.exe	a7694b884a93180a
+5426	5616	8147194373771486	strategy_core_test.exe	8df9325cc115c770
+3810	5747	8147194357608906	CMakeFiles/mmap_spsc_ring_test.dir/test/mmap_spsc_ring_test.cpp.obj	4f1bce73d6929a2e
+5616	5822	8147194375675704	spsc_ring_test.exe	38ce79b152ea86d
+5748	5939	8147194376978204	mmap_spsc_ring_test.exe	b77b12eb590c16d7
+5822	6017	8147194377733350	network_latency_model_test.exe	48f7a842eeb99e83
